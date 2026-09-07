@@ -2,16 +2,15 @@ using System.Net;
 using System.Net.Sockets;
 using LiteNetLib;
 using Serilog;
+using Yggdrasilnet.Shared;
+using Yggdrasilnet.Shared.Packet;
 
 namespace Yggdrasilnet.Server;
 
-/// <summary>
-/// Minimal LiteNetLib server wrapper. Owns the update loop and dispatches
-/// connection lifecycle events. Packet handling will be plugged in later.
-/// </summary>
 public sealed class NetServer : INetEventListener {
     private readonly NetManager _netManager;
     private readonly int _tickRate;
+    private readonly PacketRegistry _packetRegistry = new();
 
     public NetServer(int tickRate = 30) {
         _tickRate = tickRate;
@@ -50,7 +49,14 @@ public sealed class NetServer : INetEventListener {
     }
 
     public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod) {
-        // TODO: forward to a packet dispatcher once the shared packet protocol exists.
+        if (!_packetRegistry.TryRead(reader, out var packet)) {
+            Log.Warning("Received unknown/malformed packet from {EndPoint} ({Bytes} bytes)", peer.Address, reader.AvailableBytes);
+            reader.Recycle();
+            return;
+        }
+
+        Log.Debug("Received {PacketType} from {EndPoint}", packet.PacketType, peer.Address);
+        // TODO: forward `packet` to a dispatcher/handler once game logic exists.
         reader.Recycle();
     }
 
