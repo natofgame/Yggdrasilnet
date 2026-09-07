@@ -2,21 +2,28 @@ using System.Net;
 using System.Net.Sockets;
 using LiteNetLib;
 using Serilog;
-using Yggdrasilnet.Shared;
-using Yggdrasilnet.Shared.Packet;
+using Yggdrasilnet.Server.Handlers;
+using Yggdrasilnet.Shared.Network;
+using Yggdrasilnet.Shared.Network.Packet;
 
 namespace Yggdrasilnet.Server;
 
 public sealed class NetServer : INetEventListener {
     private readonly NetManager _netManager;
     private readonly int _tickRate;
-    private readonly PacketRegistry _packetRegistry = new();
+    private readonly PacketPipeline _packetPipeline = new();
 
     public NetServer(int tickRate = 30) {
         _tickRate = tickRate;
         _netManager = new NetManager(this) {
             AutoRecycle = true,
         };
+
+        RegisterHandlers();
+    }
+
+    private void RegisterHandlers() {
+        _packetPipeline.Register(PacketType.PlayerConnexion, new PlayerConnexionHandler());
     }
 
     public void Start(int port) {
@@ -49,14 +56,19 @@ public sealed class NetServer : INetEventListener {
     }
 
     public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod) {
-        if (!_packetRegistry.TryRead(reader, out var packet)) {
-            Log.Warning("Received unknown/malformed packet from {EndPoint} ({Bytes} bytes)", peer.Address, reader.AvailableBytes);
-            reader.Recycle();
-            return;
+        var result = _packetPipeline.Process(peer, reader);
+
+        switch (result) {
+            case PacketProcessResult.Malformed:
+                Log.Warning("Received malformed packet from {EndPoint} ({Bytes} bytes)", peer.Address, reader.AvailableBytes);
+                break;
+            case PacketProcessResult.NoHandler:
+                Log.Warning("No handler registered for packet from {EndPoint}", peer.Address);
+                break;
+            case PacketProcessResult.Handled:
+                break;
         }
 
-        Log.Debug("Received {PacketType} from {EndPoint}", packet.PacketType, peer.Address);
-        // TODO: forward `packet` to a dispatcher/handler once game logic exists.
         reader.Recycle();
     }
 

@@ -1,7 +1,7 @@
 using LiteNetLib.Utils;
-using Yggdrasilnet.Shared.Packet;
+using Yggdrasilnet.Shared.Network.Packet.Packets;
 
-namespace Yggdrasilnet.Shared;
+namespace Yggdrasilnet.Shared.Network.Packet;
 
 public sealed class PacketRegistry {
     private readonly Dictionary<PacketType, Func<IPacket>> _factories = new();
