@@ -20,7 +20,7 @@ public sealed class PacketRegistry {
             return true;
         }
 
-        packet = default!;
+        packet = null!;
         return false;
     }
 
@@ -28,7 +28,7 @@ public sealed class PacketRegistry {
         var typeByte = reader.GetByte();
 
         if (!Enum.IsDefined(typeof(PacketType), typeByte)) {
-            packet = default!;
+            packet = null!;
             return false;
         }
 

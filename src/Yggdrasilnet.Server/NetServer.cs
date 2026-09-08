@@ -9,21 +9,25 @@ using Yggdrasilnet.Shared.Network.Packet;
 namespace Yggdrasilnet.Server;
 
 public sealed class NetServer : INetEventListener {
+    private readonly Queue<INetEvent> _netEvents = new();
+
+    private readonly GameHandler _gameHandler;
     private readonly NetManager _netManager;
     private readonly int _tickRate;
-    private readonly PacketPipeline _packetPipeline = new();
 
+    public PacketPipeline PacketPipeline { get; } = new();
+    
+    public long Tick { get; private set; }
+    public float DeltaTime { get; private set; }
+    
     public NetServer(int tickRate = 30) {
         _tickRate = tickRate;
         _netManager = new NetManager(this) {
             AutoRecycle = true,
         };
 
-        RegisterHandlers();
-    }
-
-    private void RegisterHandlers() {
-        _packetPipeline.Register(PacketType.PlayerConnexion, new PlayerConnexionHandler());
+        _gameHandler = new GameHandler();
+        PacketPipeline.Register(PacketType.PlayerConnexion, new PlayerConnexionHandler());
     }
 
     public void Start(int port) {
@@ -44,11 +48,11 @@ public sealed class NetServer : INetEventListener {
     }
 
     public void OnPeerConnected(NetPeer peer) {
-        Log.Information("Peer connected: {EndPoint}", peer.Address);
+        _netEvents.Enqueue(new PeerConnectedEvent(peer));
     }
 
     public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo) {
-        Log.Information("Peer disconnected: {EndPoint} ({Reason})", peer.Address, disconnectInfo.Reason);
+        _netEvents.Enqueue(new PeerDisconnectedEvent(peer, disconnectInfo));
     }
 
     public void OnNetworkError(IPEndPoint endPoint, SocketError socketError) {
@@ -56,7 +60,7 @@ public sealed class NetServer : INetEventListener {
     }
 
     public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod) {
-        var result = _packetPipeline.Process(peer, reader);
+        var result = PacketPipeline.Process(peer, reader);
 
         switch (result) {
             case PacketProcessResult.Malformed:
@@ -70,6 +74,29 @@ public sealed class NetServer : INetEventListener {
         }
 
         reader.Recycle();
+    }
+
+    public void OnUpdate(float deltaTime) {
+        Tick++;
+        DeltaTime = deltaTime;
+        
+        _netManager.PollEvents();
+        ProcessNetEvents();
+    }
+
+    private void ProcessNetEvents() {
+        while (_netEvents.Count > 0) {
+            var netEvent = _netEvents.Dequeue();
+
+            switch (netEvent) {
+                case PeerConnectedEvent peerConnectedEvent:
+                    _gameHandler.CreatePlayer(peerConnectedEvent.Peer);
+                    break;
+                case PeerDisconnectedEvent peerDisconnectedEvent:
+                    _gameHandler.RemovePlayer(peerDisconnectedEvent.Peer, peerDisconnectedEvent.Info);
+                    break;
+            }
+        }
     }
 
     public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType) { }

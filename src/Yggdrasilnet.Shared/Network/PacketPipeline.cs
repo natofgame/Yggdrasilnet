@@ -13,6 +13,8 @@ public enum PacketProcessResult {
 public sealed class PacketPipeline {
     private readonly PacketDispatcher _dispatcher = new();
     private readonly PacketRegistry _registry = new();
+    
+    public PacketRegistry GetRegistry() => _registry;
 
     public void Register<T>(PacketType type, IPacketHandler<T> handler) where T : IPacket {
         _dispatcher.Register(type, handler);
