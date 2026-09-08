@@ -1,20 +1,21 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using LiteNetLib;
+using LiteNetLib.Utils;
 using Serilog;
+using Yggdrasilnet.Server.Simulation;
+using Yggdrasilnet.Shared.Network.Packet;
 
 namespace Yggdrasilnet.Server;
 
-/// <summary>
-/// Minimal LiteNetLib server wrapper. Owns the update loop and dispatches
-/// connection lifecycle events. Packet handling will be plugged in later.
-/// </summary>
 public sealed class NetServer : INetEventListener {
     private readonly NetManager _netManager;
-    private readonly int _tickRate;
+    private readonly PacketRegistry _packetRegistry = new();
+    private readonly ConcurrentQueue<ISimulationEvent> _simulationEvents;
 
-    public NetServer(int tickRate = 30) {
-        _tickRate = tickRate;
+    public NetServer(ConcurrentQueue<ISimulationEvent> worldEvents) {
+        _simulationEvents = worldEvents;
         _netManager = new NetManager(this) {
             AutoRecycle = true,
         };
@@ -22,27 +23,29 @@ public sealed class NetServer : INetEventListener {
 
     public void Start(int port) {
         _netManager.Start(port);
-        Log.Information("Server listening on port {Port} ({TickRate} tps)", port, _tickRate);
+        Log.Information("Server listening on port {Port}", port);
     }
 
     public void Stop() {
         _netManager.Stop();
     }
 
-    public async Task RunAsync(CancellationToken cancellationToken) {
-        var tickInterval = TimeSpan.FromSeconds(1.0 / _tickRate);
-        while (!cancellationToken.IsCancellationRequested) {
-            _netManager.PollEvents();
-            await Task.Delay(tickInterval, cancellationToken).ContinueWith(_ => { });
-        }
+    public void Poll() {
+        _netManager.PollEvents();
+    }
+
+    public void Send<T>(NetPeer peer, T packet, DeliveryMethod method = DeliveryMethod.ReliableOrdered) where T : IPacket {
+        var writer = new NetDataWriter();
+        _packetRegistry.Write(writer, packet);
+        peer.Send(writer, method);
     }
 
     public void OnPeerConnected(NetPeer peer) {
-        Log.Information("Peer connected: {EndPoint}", peer.Address);
+        _simulationEvents.Enqueue(new PeerConnectedEvent(peer));
     }
 
     public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo) {
-        Log.Information("Peer disconnected: {EndPoint} ({Reason})", peer.Address, disconnectInfo.Reason);
+        _simulationEvents.Enqueue(new PeerDisconnectedEvent(peer, disconnectInfo));
     }
 
     public void OnNetworkError(IPEndPoint endPoint, SocketError socketError) {
@@ -50,7 +53,12 @@ public sealed class NetServer : INetEventListener {
     }
 
     public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod) {
-        // TODO: forward to a packet dispatcher once the shared packet protocol exists.
+        if (_packetRegistry.TryRead(reader, out var packet)) {
+            _simulationEvents.Enqueue(new PacketReceivedEvent(peer, packet));
+        } else {
+            Log.Warning("Received malformed packet from {EndPoint} ({Bytes} bytes)", peer.Address, reader.AvailableBytes);
+        }
+
         reader.Recycle();
     }
 

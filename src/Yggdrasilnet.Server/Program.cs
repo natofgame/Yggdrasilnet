@@ -1,5 +1,6 @@
 using Serilog;
 using Yggdrasilnet.Server;
+using Yggdrasilnet.Server.Simulation;
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Debug()
@@ -7,9 +8,14 @@ Log.Logger = new LoggerConfiguration()
     .CreateLogger();
 
 const int port = 9050;
+const int tickRate = 30;
 
-var server = new NetServer(tickRate: 30);
-server.Start(port);
+var simulation = new Simulation();
+var netServer = new NetServer(simulation.IncomingEvents);
+netServer.Start(port);
+
+var gameLoop = new GameLoop(netServer, simulation, tickRate);
+simulation.NetServer = netServer;
 
 using var cts = new CancellationTokenSource();
 Console.CancelKeyPress += (_, args) => {
@@ -17,7 +23,8 @@ Console.CancelKeyPress += (_, args) => {
     cts.Cancel();
 };
 
-await server.RunAsync(cts.Token);
+Log.Information("Game loop running at {TickRate} tps", tickRate);
+gameLoop.Run(cts.Token);
 
-server.Stop();
+netServer.Stop();
 Log.Information("Server stopped.");
