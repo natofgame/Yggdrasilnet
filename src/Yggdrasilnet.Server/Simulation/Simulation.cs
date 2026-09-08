@@ -52,12 +52,24 @@ public sealed class Simulation : ISimulationContext {
 
     private void CreatePlayer(NetPeer peer) {
         var session = _sessions.Create(peer, Tick);
-        Log.Information("Player {PlayerId} connected: {EndPoint}", session.Id, peer.Address);
+        
+        var entity = World.Spawn();
+        session.EntityId = entity.Id;
+        
+        Log.Information("Player {PlayerId} connected: {EndPoint} entity: {EntityId}", session.Id, peer.Address, entity.Id);
     }
 
     private void RemovePlayer(NetPeer peer, DisconnectInfo info) {
         if (!_sessions.Remove(peer, out var session)) {
             return;
+        }
+
+        if (session != null) {
+            var id = session.EntityId;
+            if (id == -1) {
+                return;
+            }
+            World.Despawn(id);
         }
 
         Log.Information("Player {PlayerId} disconnected: {EndPoint} ({Reason})", session!.Id, peer.Address, info.Reason);
