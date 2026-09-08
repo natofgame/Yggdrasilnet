@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using LiteNetLib;
 
 namespace Yggdrasilnet.Server;
 
@@ -16,6 +17,7 @@ public sealed class GameLoop(NetServer netServer, Simulation.Simulation simulati
             if (now >= nextTickTime) {
                 netServer.Poll();
                 simulation.Update(deltaTime);
+                BroadcastSnapshot();
 
                 nextTickTime += tickIntervalMs;
                 if (stopwatch.ElapsedMilliseconds > nextTickTime + tickIntervalMs) {
@@ -27,6 +29,18 @@ public sealed class GameLoop(NetServer netServer, Simulation.Simulation simulati
                     Thread.Sleep(1);
                 }
             }
+        }
+    }
+
+    private void BroadcastSnapshot() {
+        var sessions = simulation.Sessions.All;
+        if (sessions.Count == 0) {
+            return;
+        }
+
+        var snapshot = simulation.BuildSnapshot();
+        foreach (var session in sessions) {
+            netServer.Send(session.Peer, snapshot, DeliveryMethod.Sequenced);
         }
     }
 }

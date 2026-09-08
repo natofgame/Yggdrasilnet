@@ -3,9 +3,11 @@ using LiteNetLib;
 using Serilog;
 using Yggdrasilnet.Server.Handlers;
 using Yggdrasilnet.Server.Simulation.Session;
+using Yggdrasilnet.Server.Simulation.World.Component;
 using Yggdrasilnet.Shared.Network;
 using Yggdrasilnet.Shared.Network.Packet;
 using Yggdrasilnet.Shared.Network.Packet.Packets;
+using Yggdrasilnet.Shared.Network.Packet.Snapshot;
 
 namespace Yggdrasilnet.Server.Simulation;
 
@@ -55,6 +57,8 @@ public sealed class Simulation : ISimulationContext {
         
         var entity = World.Spawn();
         session.EntityId = entity.Id;
+
+        entity.AddComponent(new VelocityComponent { X = 1f, Y = 0f, Z = 0f });
         
         Log.Information("Player {PlayerId} connected: {EndPoint} entity: {EntityId}", session.Id, peer.Address, entity.Id);
     }
@@ -73,5 +77,26 @@ public sealed class Simulation : ISimulationContext {
         }
 
         Log.Information("Player {PlayerId} disconnected: {EndPoint} ({Reason})", session!.Id, peer.Address, info.Reason);
+    }
+
+    public SnapshotPacket BuildSnapshot() {
+        var packet = new SnapshotPacket();
+        foreach (var entity in World.Entities) {
+            var snapshot = new EntitySnapshot {
+                EntityId =  entity.Id,
+                PositionX = entity.Position.X,
+                PositionY = entity.Position.Y,
+                PositionZ = entity.Position.Z
+            };
+            foreach (var component in entity.Components) {
+                if (component is INetworkedComponent networked) {
+                    snapshot.Components.Add(networked);
+                }
+            }
+
+            packet.Entities.Add(snapshot);
+        }
+
+        return packet;
     }
 }

@@ -8,6 +8,8 @@ public sealed class Entity {
     public Vector3 Position { get; set; }
 
     private readonly Dictionary<Type, IComponent> _components = new();
+    
+    public IEnumerable<IComponent> Components => _components.Values;
 
     public Entity(int id, Vector3 position = default) {
         Id = id;
