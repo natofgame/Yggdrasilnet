@@ -16,7 +16,7 @@ public sealed class Simulation : ISimulationContext {
 
     private readonly PacketDispatcher<ISimulationContext> _dispatcher = new();
     private readonly PlayerSessionRegistry _sessions = new();
-    private readonly World.World _world = new();
+    private readonly World.World _world;
 
     public long Tick { get; private set; }
     public PlayerSessionRegistry Sessions => _sessions;
@@ -24,6 +24,9 @@ public sealed class Simulation : ISimulationContext {
 
     public Simulation() {
         _dispatcher.Register(PacketType.PlayerConnexion, new PlayerConnexionHandler());
+        
+        _world = new World.World();
+        _world.Load();
     }
 
     public void Update(float deltaTime) {

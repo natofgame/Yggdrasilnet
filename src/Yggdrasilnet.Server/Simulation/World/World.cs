@@ -42,4 +42,8 @@ public sealed class World {
             system.Update(this, deltaTime);
         }
     }
+
+    public void Load() {
+        AddSystem(new MovementSystem());
+    }
 }
