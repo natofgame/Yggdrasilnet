@@ -14,8 +14,6 @@
 - **ECS-style world** - entities, components and systems drive gameplay logic in a data-oriented way.
 - **Fixed tick-rate game loop** - deterministic, predictable simulation steps.
 - **Lightweight UDP networking** via LiteNetLib, with a shared binary packet protocol between client and server.
-- **Structured logging** with Serilog.
-- **Test suite** covering server logic, plus a fake client for manual integration testing.
 
 ## 📁 Project structure
 
