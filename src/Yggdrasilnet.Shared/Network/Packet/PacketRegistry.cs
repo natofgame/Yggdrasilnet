@@ -8,6 +8,7 @@ public sealed class PacketRegistry {
 
     public PacketRegistry() {
         Register(PacketType.PlayerConnexion, () => new PlayerConnexionPacket());
+        Register(PacketType.Snapshot, () => new SnapshotPacket());
     }
 
     public void Register(PacketType type, Func<IPacket> factory) {
