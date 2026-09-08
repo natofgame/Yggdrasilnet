@@ -7,14 +7,17 @@ public sealed class PlayerConnexionPacket : IPacket {
 
     public int PlayerId { get; set; }
     public bool IsOwner { get; set; }
+    public int EntityId { get; set; }
 
     public void Serialize(NetDataWriter writer) {
         writer.Put(PlayerId);
         writer.Put(IsOwner);
+        writer.Put(EntityId);
     }
 
     public void Deserialize(NetDataReader reader) {
         PlayerId = reader.GetInt();
         IsOwner = reader.GetBool();
+        EntityId = reader.GetInt();
     }
 }

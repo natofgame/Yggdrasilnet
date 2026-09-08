@@ -8,12 +8,15 @@ public sealed class EntitySnapshot {
     public float PositionY { get; set; }
     public float PositionZ { get; set; }
     public List<INetworkedComponent> Components { get; set; } = new();
+    
+    public uint LastInputSequence { get; set; }
 
     public void WriteTo(NetDataWriter writer) {
         writer.Put(EntityId);
         writer.Put(PositionX);
         writer.Put(PositionY);
         writer.Put(PositionZ);
+        writer.Put(LastInputSequence);
 
         writer.Put((ushort)Components.Count);
         foreach (var component in Components) {
@@ -28,6 +31,7 @@ public sealed class EntitySnapshot {
             PositionX = reader.GetFloat(),
             PositionY = reader.GetFloat(),
             PositionZ = reader.GetFloat(),
+            LastInputSequence = reader.GetUInt(),
         };
 
         var count = reader.GetUShort();

@@ -19,6 +19,7 @@ public sealed class EntityFactory {
         return definition switch {
             ContentEntity.VelocityComponentDefinition velocity => new VelocityComponent { X = velocity.Speed },
             ContentEntity.HealthComponentDefinition health => new HealthComponent { Max = health.Max, Current = health.Max },
+            ContentEntity.InputComponentDefinition input => new InputComponent { Speed =  input.Speed },
             _ => throw new NotSupportedException($"Unknown component definition {definition.GetType()}")
         };
     }

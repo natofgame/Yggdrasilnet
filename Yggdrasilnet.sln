@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Yggdrasilnet.Server", "src\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Yggdrasilnet.FakeClient", "src\Yggdrasilnet.FakeClient\Yggdrasilnet.FakeClient.csproj", "{9020B37F-8751-41D0-A454-4C87E027D5C2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Yggdrasilnet.Server.Tests", "src\Yggdrasilnet.Server.Tests\Yggdrasilnet.Server.Tests.csproj", "{61024DA3-CD8E-494D-B04C-D0E5EB471FAE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -57,6 +59,18 @@ Global
 		{9020B37F-8751-41D0-A454-4C87E027D5C2}.Release|x64.Build.0 = Release|Any CPU
 		{9020B37F-8751-41D0-A454-4C87E027D5C2}.Release|x86.ActiveCfg = Release|Any CPU
 		{9020B37F-8751-41D0-A454-4C87E027D5C2}.Release|x86.Build.0 = Release|Any CPU
+		{61024DA3-CD8E-494D-B04C-D0E5EB471FAE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{61024DA3-CD8E-494D-B04C-D0E5EB471FAE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{61024DA3-CD8E-494D-B04C-D0E5EB471FAE}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{61024DA3-CD8E-494D-B04C-D0E5EB471FAE}.Debug|x64.Build.0 = Debug|Any CPU
+		{61024DA3-CD8E-494D-B04C-D0E5EB471FAE}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{61024DA3-CD8E-494D-B04C-D0E5EB471FAE}.Debug|x86.Build.0 = Debug|Any CPU
+		{61024DA3-CD8E-494D-B04C-D0E5EB471FAE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{61024DA3-CD8E-494D-B04C-D0E5EB471FAE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{61024DA3-CD8E-494D-B04C-D0E5EB471FAE}.Release|x64.ActiveCfg = Release|Any CPU
+		{61024DA3-CD8E-494D-B04C-D0E5EB471FAE}.Release|x64.Build.0 = Release|Any CPU
+		{61024DA3-CD8E-494D-B04C-D0E5EB471FAE}.Release|x86.ActiveCfg = Release|Any CPU
+		{61024DA3-CD8E-494D-B04C-D0E5EB471FAE}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -65,5 +79,6 @@ Global
 		{63E8D0D1-9E42-42E2-B9A8-0F4D0B9F9D18} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{02F0935D-2858-48C7-8E82-F298F929C773} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{9020B37F-8751-41D0-A454-4C87E027D5C2} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{61024DA3-CD8E-494D-B04C-D0E5EB471FAE} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal

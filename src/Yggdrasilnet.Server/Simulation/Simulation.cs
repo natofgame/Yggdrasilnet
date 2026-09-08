@@ -25,12 +25,15 @@ public sealed class Simulation : ISimulationContext {
     private readonly DefinitionRegistry<ContentEntity.EntityDefinition> _entityDefinitions = new();
     private readonly EntityFactory _entityFactory = new();
 
+    public NetServer? NetServer { get; set; }
+    
     public long Tick { get; private set; }
     public PlayerSessionRegistry Sessions => _sessions;
     public World.World World => _world;
 
     public Simulation() {
         _dispatcher.Register(PacketType.PlayerConnexion, new PlayerConnexionHandler());
+        _dispatcher.Register(PacketType.Input, new InputHandler());
         
         _world = new World.World();
         _world.Load();
@@ -85,7 +88,8 @@ public sealed class Simulation : ISimulationContext {
 
         var entity = _entityFactory.Create(playerDefinition, World, Vector3.Zero);
         session.EntityId = entity.Id;
-
+        
+        NetServer?.Send(peer, new PlayerConnexionPacket { EntityId = entity.Id, IsOwner = true });
         Log.Information("Player {PlayerId} connected: {EndPoint} entity: {EntityId}", session.Id, peer.Address, entity.Id);
     }
 
@@ -119,7 +123,10 @@ public sealed class Simulation : ISimulationContext {
                     snapshot.Components.Add(networked);
                 }
             }
-
+            if (entity.TryGetComponent<InputComponent>(out var input)) {
+                snapshot.LastInputSequence = input.LastSequence;
+            }
+            
             packet.Entities.Add(snapshot);
         }
 

@@ -15,6 +15,7 @@ var netServer = new NetServer(simulation.IncomingEvents);
 netServer.Start(port);
 
 var gameLoop = new GameLoop(netServer, simulation, tickRate);
+simulation.NetServer = netServer;
 
 using var cts = new CancellationTokenSource();
 Console.CancelKeyPress += (_, args) => {

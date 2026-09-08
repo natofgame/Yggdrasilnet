@@ -28,6 +28,7 @@ Console.CancelKeyPress += (_, args) => {
 };
 
 var sentHello = false;
+var sentInput = false;
 
 while (!cts.IsCancellationRequested) {
     client.PollEvents();
@@ -38,6 +39,14 @@ while (!cts.IsCancellationRequested) {
         peer.Send(writer, DeliveryMethod.ReliableOrdered);
         Log.Information("Sent PlayerConnexionPacket (playerId={PlayerId})", peer.Id);
         sentHello = true;
+    }
+
+    if (sentHello && !sentInput && listener.Server is { } peer2) {
+        var writer = new LiteNetLib.Utils.NetDataWriter();
+        packetRegistry.Write(writer, new InputPacket { Sequence = 42, MoveX = 1f, MoveZ = 0f, DeltaTime = 0.05f });
+        peer2.Send(writer, DeliveryMethod.ReliableOrdered);
+        Log.Information("Sent test InputPacket (sequence=42)");
+        sentInput = true;
     }
 
     Thread.Sleep(15);

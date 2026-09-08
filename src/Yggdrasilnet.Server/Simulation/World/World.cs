@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using Yggdrasilnet.Server.Simulation.World.Component;
 using Yggdrasilnet.Server.Simulation.World.System;
@@ -25,7 +26,7 @@ public sealed class World {
         return _entities.Remove(entityId);
     }
 
-    public bool TryGetEntity(int entityId, out Entity? entity) {
+    public bool TryGetEntity(int entityId, [NotNullWhen(true)] out Entity? entity) {
         return _entities.TryGetValue(entityId, out entity);
     }
 
@@ -45,5 +46,6 @@ public sealed class World {
 
     public void Load() {
         AddSystem(new MovementSystem());
+        AddSystem(new PlayerMovementSystem());
     }
 }
