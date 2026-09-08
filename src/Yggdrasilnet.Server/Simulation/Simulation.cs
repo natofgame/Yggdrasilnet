@@ -14,10 +14,11 @@ public sealed class Simulation : ISimulationContext {
 
     private readonly PacketDispatcher<ISimulationContext> _dispatcher = new();
     private readonly PlayerSessionRegistry _sessions = new();
-    private readonly Level _level = new();
+    private readonly World.World _world = new();
 
     public long Tick { get; private set; }
     public PlayerSessionRegistry Sessions => _sessions;
+    public World.World World => _world;
 
     public Simulation() {
         _dispatcher.Register(PacketType.PlayerConnexion, new PlayerConnexionHandler());
@@ -27,7 +28,7 @@ public sealed class Simulation : ISimulationContext {
         Tick++;
 
         DrainIncomingEvents();
-        _level.Update(deltaTime);
+        _world.Update(deltaTime);
     }
 
     private void DrainIncomingEvents() {
