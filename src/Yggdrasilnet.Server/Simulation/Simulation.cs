@@ -1,9 +1,13 @@
 using System.Collections.Concurrent;
+using System.Numerics;
 using LiteNetLib;
 using Serilog;
 using Yggdrasilnet.Server.Handlers;
+using Yggdrasilnet.Server.Simulation.Content;
+using ContentEntity = Yggdrasilnet.Server.Simulation.Content.Entity;
 using Yggdrasilnet.Server.Simulation.Session;
 using Yggdrasilnet.Server.Simulation.World.Component;
+using Yggdrasilnet.Server.Utils;
 using Yggdrasilnet.Shared.Network;
 using Yggdrasilnet.Shared.Network.Packet;
 using Yggdrasilnet.Shared.Network.Packet.Packets;
@@ -18,6 +22,9 @@ public sealed class Simulation : ISimulationContext {
     private readonly PlayerSessionRegistry _sessions = new();
     private readonly World.World _world;
 
+    private readonly DefinitionRegistry<ContentEntity.EntityDefinition> _entityDefinitions = new();
+    private readonly EntityFactory _entityFactory = new();
+
     public long Tick { get; private set; }
     public PlayerSessionRegistry Sessions => _sessions;
     public World.World World => _world;
@@ -27,6 +34,18 @@ public sealed class Simulation : ISimulationContext {
         
         _world = new World.World();
         _world.Load();
+
+        _entityDefinitions.Load(ContentPaths.Resolve("Entities"));
+
+        SpawnTestMonsters();
+    }
+
+    private void SpawnTestMonsters() {
+        if (_entityDefinitions.TryGet("goblin", out var goblinDefinition)) {
+            _entityFactory.Create(goblinDefinition, World, new Vector3(3f, 0f, 0f));
+        } else {
+            Log.Warning("Entity definition 'goblin' not found");
+        }
     }
 
     public void Update(float deltaTime) {
@@ -57,12 +76,16 @@ public sealed class Simulation : ISimulationContext {
 
     private void CreatePlayer(NetPeer peer) {
         var session = _sessions.Create(peer, Tick);
-        
-        var entity = World.Spawn();
+
+        if (!_entityDefinitions.TryGet("player", out var playerDefinition)) {
+            Log.Warning("Entity definition 'player' not found, disconnecting {EndPoint}", peer.Address);
+            peer.Disconnect();
+            return;
+        }
+
+        var entity = _entityFactory.Create(playerDefinition, World, Vector3.Zero);
         session.EntityId = entity.Id;
 
-        entity.AddComponent(new VelocityComponent { X = 1f, Y = 0f, Z = 0f });
-        
         Log.Information("Player {PlayerId} connected: {EndPoint} entity: {EntityId}", session.Id, peer.Address, entity.Id);
     }
 

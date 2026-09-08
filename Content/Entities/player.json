@@ -1,0 +1,6 @@
+{
+  "id": "player",
+  "components": [
+    { "type": "velocity", "speed": 1 }
+  ]
+}

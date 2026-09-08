@@ -16,8 +16,8 @@ public sealed class Entity {
         Position = position;
     }
 
-    public void AddComponent<T>(T component) where T : class, IComponent {
-        _components[typeof(T)] = component;
+    public void AddComponent(IComponent component) {
+        _components[component.GetType()] = component;
     }
 
     public bool RemoveComponent<T>() where T : IComponent {
