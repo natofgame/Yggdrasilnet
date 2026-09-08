@@ -9,14 +9,15 @@ using Yggdrasilnet.Shared.Network.Packet.Packets;
 
 namespace Yggdrasilnet.Server.Simulation;
 
-public sealed class Simulation {
+public sealed class Simulation : ISimulationContext {
     public ConcurrentQueue<ISimulationEvent> IncomingEvents { get; } = new();
 
-    private readonly PacketDispatcher _dispatcher = new();
+    private readonly PacketDispatcher<ISimulationContext> _dispatcher = new();
     private readonly PlayerSessionRegistry _sessions = new();
     private readonly Level _level = new();
 
     public long Tick { get; private set; }
+    public PlayerSessionRegistry Sessions => _sessions;
 
     public Simulation() {
         _dispatcher.Register(PacketType.PlayerConnexion, new PlayerConnexionHandler());
@@ -39,7 +40,7 @@ public sealed class Simulation {
                     RemovePlayer(peerDisconnected.Peer, peerDisconnected.Info);
                     break;
                 case PacketReceivedEvent packetReceived:
-                    if (!_dispatcher.Dispatch(packetReceived.Peer, packetReceived.Packet)) {
+                    if (!_dispatcher.Dispatch(packetReceived.Peer, packetReceived.Packet, this)) {
                         Log.Warning("No handler registered for packet {PacketType} from {EndPoint}",
                             packetReceived.Packet.PacketType, packetReceived.Peer.Address);
                     }
