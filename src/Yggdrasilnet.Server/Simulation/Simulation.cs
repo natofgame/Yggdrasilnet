@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using LiteNetLib;
 using Serilog;
 using Yggdrasilnet.Server.Handlers;
+using Yggdrasilnet.Server.Simulation.Session;
 using Yggdrasilnet.Shared.Network;
 using Yggdrasilnet.Shared.Network.Packet;
 using Yggdrasilnet.Shared.Network.Packet.Packets;
@@ -12,6 +13,7 @@ public sealed class Simulation {
     public ConcurrentQueue<ISimulationEvent> IncomingEvents { get; } = new();
 
     private readonly PacketDispatcher _dispatcher = new();
+    private readonly PlayerSessionRegistry _sessions = new();
     private readonly Level _level = new();
 
     public long Tick { get; private set; }
@@ -47,10 +49,15 @@ public sealed class Simulation {
     }
 
     private void CreatePlayer(NetPeer peer) {
-        Log.Information("Player connected: {EndPoint}", peer.Address);
+        var session = _sessions.Create(peer, Tick);
+        Log.Information("Player {PlayerId} connected: {EndPoint}", session.Id, peer.Address);
     }
 
     private void RemovePlayer(NetPeer peer, DisconnectInfo info) {
-        Log.Information("Player disconnected: {EndPoint} ({Reason})", peer.Address, info.Reason);
+        if (!_sessions.Remove(peer, out var session)) {
+            return;
+        }
+
+        Log.Information("Player {PlayerId} disconnected: {EndPoint} ({Reason})", session!.Id, peer.Address, info.Reason);
     }
 }

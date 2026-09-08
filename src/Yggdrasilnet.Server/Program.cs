@@ -10,8 +10,6 @@ Log.Logger = new LoggerConfiguration()
 const int port = 9050;
 const int tickRate = 30;
 
-// Simulation runs the fixed-tick game logic; NetServer only polls the socket and feeds
-// simulation.IncomingEvents. The two never call into each other directly.
 var simulation = new Simulation();
 var netServer = new NetServer(simulation.IncomingEvents);
 netServer.Start(port);
