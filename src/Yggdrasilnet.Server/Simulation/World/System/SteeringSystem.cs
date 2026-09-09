@@ -5,7 +5,21 @@ using Yggdrasilnet.Server.Simulation.World.Component;
 namespace Yggdrasilnet.Server.Simulation.World.System;
 
 public sealed class SteeringSystem : ISystem {
+    private const int MaxNeighborsPerEntity = 10;
+    private const float NearPlayerDistance = 18f;
+    private const float MidPlayerDistance = 36f;
+    private const float WanderAvoidDistance = 28f;
+    private const float MinDistanceSquared = 0.0001f;
+
+    private const float NearPlayerDistanceSquared = NearPlayerDistance * NearPlayerDistance;
+    private const float MidPlayerDistanceSquared = MidPlayerDistance * MidPlayerDistance;
+    private const float WanderAvoidDistanceSquared = WanderAvoidDistance * WanderAvoidDistance;
+
+    private long _steeringTick;
+
     public void Update(World world, float deltaTime) {
+        _steeringTick++;
+
         var steered = world.Query<SteeringComponent>().ToList();
         var targets = world.Query<InputComponent>().ToList();
         if (steered.Count == 0) {
@@ -15,20 +29,32 @@ public sealed class SteeringSystem : ISystem {
         var maxAvoidRadius = steered.Max(pair => pair.Component.AvoidRadius);
         var cellSize = MathF.Max(0.1f, maxAvoidRadius);
         var steeringGrid = BuildSteeringGrid(steered, cellSize);
+        if (targets.Count == 0) {
+            ApplyNoPlayerSteering(steered, steeringGrid, cellSize);
+            return;
+        }
 
         foreach (var (entity, steering) in steered) {
             if (!entity.TryGetComponent<VelocityComponent>(out var velocity)) {
                 continue;
             }
 
+            var selfPosition = Flat(entity.Position);
+            var target = FindNearestTarget(selfPosition, targets, out var nearestPlayerDistanceSquared);
+            var updateInterval = ResolveUpdateInterval(nearestPlayerDistanceSquared);
+            if (updateInterval > 1 && ((_steeringTick + entity.Id) % updateInterval) != 0) {
+                continue;
+            }
+
+            var enableWanderAndAvoid = nearestPlayerDistanceSquared <= WanderAvoidDistanceSquared;
             var steer = Vector2.Zero;
 
-            var target = FindNearestTarget(entity, targets);
             if (target != null) {
-                var toTarget = Flat(target.Position) - Flat(entity.Position);
-                var distance = toTarget.Length();
+                var toTarget = Flat(target.Position) - selfPosition;
+                var distanceSquared = toTarget.LengthSquared();
+                var distance = MathF.Sqrt(distanceSquared);
 
-                if (distance > 0.0001f) {
+                if (distanceSquared > MinDistanceSquared) {
                     var direction = toTarget / distance;
 
                     steer += direction * steering.SeekWeight;
@@ -40,34 +66,44 @@ public sealed class SteeringSystem : ISystem {
                     var tangent = new Vector2(-direction.Y, direction.X) * steering.CircleDirection;
                     steer += tangent * steering.CircleWeight;
 
-                    if (distance < steering.AvoidRadius) {
+                    if (enableWanderAndAvoid && distance < steering.AvoidRadius) {
                         var strength = (steering.AvoidRadius - distance) / steering.AvoidRadius;
                         steer -= direction * strength * steering.AvoidWeight;
                     }
                 }
             }
 
-            foreach (var (other, _) in EnumerateNearby(steeringGrid, cellSize, entity.Position, steering.AvoidRadius)) {
-                if (other.Id == entity.Id) {
-                    continue;
-                }
+            if (enableWanderAndAvoid) {
+                var processedNeighbors = 0;
+                var avoidRadiusSquared = steering.AvoidRadius * steering.AvoidRadius;
+                foreach (var (other, _) in EnumerateNearby(steeringGrid, cellSize, entity.Position, steering.AvoidRadius)) {
+                    if (other.Id == entity.Id) {
+                        continue;
+                    }
 
-                var away = Flat(entity.Position) - Flat(other.Position);
-                var distance = away.Length();
-                if (distance > 0.0001f && distance < steering.AvoidRadius) {
-                    var strength = (steering.AvoidRadius - distance) / steering.AvoidRadius;
-                    steer += away / distance * strength * steering.AvoidWeight;
+                    processedNeighbors++;
+                    if (processedNeighbors > MaxNeighborsPerEntity) {
+                        break;
+                    }
+
+                    var away = selfPosition - Flat(other.Position);
+                    var distanceSquared = away.LengthSquared();
+                    if (distanceSquared > MinDistanceSquared && distanceSquared < avoidRadiusSquared) {
+                        var distance = MathF.Sqrt(distanceSquared);
+                        var strength = (steering.AvoidRadius - distance) / steering.AvoidRadius;
+                        steer += away / distance * strength * steering.AvoidWeight;
+                    }
                 }
             }
 
-            if (steering.WanderWeight > 0f) {
+            if (enableWanderAndAvoid && steering.WanderWeight > 0f) {
                 var jitter = ((float)Random.Shared.NextDouble() * 2f - 1f) * steering.WanderJitter * deltaTime;
                 steering.WanderAngle += jitter;
                 var wanderDirection = new Vector2(MathF.Cos(steering.WanderAngle), MathF.Sin(steering.WanderAngle));
                 steer += wanderDirection * steering.WanderWeight;
             }
 
-            if (steer.LengthSquared() > 0.0001f) {
+            if (steer.LengthSquared() > MinDistanceSquared) {
                 var direction = Vector2.Normalize(steer);
                 velocity.X = direction.X * steering.MoveSpeed;
                 velocity.Z = direction.Y * steering.MoveSpeed;
@@ -78,19 +114,75 @@ public sealed class SteeringSystem : ISystem {
         }
     }
 
-    private static Entity? FindNearestTarget(Entity entity, List<(Entity Entity, InputComponent Component)> targets) {
+    private static Entity? FindNearestTarget(Vector2 entityPosition, List<(Entity Entity, InputComponent Component)> targets, out float nearestDistanceSquared) {
         Entity? nearest = null;
-        var bestDistanceSquared = float.MaxValue;
+        nearestDistanceSquared = float.MaxValue;
 
         foreach (var (target, _) in targets) {
-            var distanceSquared = (Flat(target.Position) - Flat(entity.Position)).LengthSquared();
-            if (distanceSquared < bestDistanceSquared) {
-                bestDistanceSquared = distanceSquared;
+            var distanceSquared = (Flat(target.Position) - entityPosition).LengthSquared();
+            if (distanceSquared < nearestDistanceSquared) {
+                nearestDistanceSquared = distanceSquared;
                 nearest = target;
             }
         }
 
         return nearest;
+    }
+
+    private static int ResolveUpdateInterval(float nearestPlayerDistanceSquared) {
+        if (nearestPlayerDistanceSquared <= NearPlayerDistanceSquared) {
+            return 1;
+        }
+
+        if (nearestPlayerDistanceSquared <= MidPlayerDistanceSquared) {
+            return 2;
+        }
+
+        return 3;
+    }
+
+    private static void ApplyNoPlayerSteering(
+        List<(Entity Entity, SteeringComponent Component)> steered,
+        Dictionary<(int X, int Y), List<(Entity Entity, SteeringComponent Component)>> steeringGrid,
+        float cellSize
+    ) {
+        foreach (var (entity, steering) in steered) {
+            if (!entity.TryGetComponent<VelocityComponent>(out var velocity)) {
+                continue;
+            }
+
+            var selfPosition = Flat(entity.Position);
+            var steer = Vector2.Zero;
+            var avoidRadiusSquared = steering.AvoidRadius * steering.AvoidRadius;
+            var processedNeighbors = 0;
+            foreach (var (other, _) in EnumerateNearby(steeringGrid, cellSize, entity.Position, steering.AvoidRadius)) {
+                if (other.Id == entity.Id) {
+                    continue;
+                }
+
+                processedNeighbors++;
+                if (processedNeighbors > MaxNeighborsPerEntity) {
+                    break;
+                }
+
+                var away = selfPosition - Flat(other.Position);
+                var distanceSquared = away.LengthSquared();
+                if (distanceSquared > MinDistanceSquared && distanceSquared < avoidRadiusSquared) {
+                    var distance = MathF.Sqrt(distanceSquared);
+                    var strength = (steering.AvoidRadius - distance) / steering.AvoidRadius;
+                    steer += away / distance * strength * steering.AvoidWeight;
+                }
+            }
+
+            if (steer.LengthSquared() > MinDistanceSquared) {
+                var direction = Vector2.Normalize(steer);
+                velocity.X = direction.X * steering.MoveSpeed;
+                velocity.Z = direction.Y * steering.MoveSpeed;
+            } else {
+                velocity.X = 0f;
+                velocity.Z = 0f;
+            }
+        }
     }
 
     private static Dictionary<(int X, int Y), List<(Entity Entity, SteeringComponent Component)>> BuildSteeringGrid(
