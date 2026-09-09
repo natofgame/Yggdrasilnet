@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using Yggdrasilnet.Server.Simulation.World.Component;
@@ -8,9 +9,12 @@ namespace Yggdrasilnet.Server.Simulation.World;
 public sealed class World {
     private readonly Dictionary<int, Entity> _entities = new();
     private readonly List<ISystem> _systems = new();
+    private readonly Dictionary<string, double> _lastSystemTimingsMs = new();
     private int _nextEntityId = 1;
 
     public IReadOnlyCollection<Entity> Entities => _entities.Values;
+
+    public IReadOnlyDictionary<string, double> LastSystemTimingsMs => _lastSystemTimingsMs;
 
     public void AddSystem(ISystem system) {
         _systems.Add(system);
@@ -39,8 +43,11 @@ public sealed class World {
     }
 
     public void Update(float deltaTime) {
+        var stopwatch = Stopwatch.StartNew();
         foreach (var system in _systems) {
+            stopwatch.Restart();
             system.Update(this, deltaTime);
+            _lastSystemTimingsMs[system.GetType().Name] = stopwatch.Elapsed.TotalMilliseconds;
         }
     }
 

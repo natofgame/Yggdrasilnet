@@ -34,31 +34,49 @@ public sealed class Simulation : ISimulationContext {
     public Simulation() {
         _dispatcher.Register(PacketType.PlayerConnexion, new PlayerConnexionHandler());
         _dispatcher.Register(PacketType.Input, new InputHandler());
+        _dispatcher.Register(PacketType.SpawnEntities, new SpawnEntitiesHandler());
         
         _world = new World.World();
         _world.Load();
 
         _entityDefinitions.Load(ContentPaths.Resolve("Entities"));
 
-        SpawnTestMonsters();
+        SpawnEntities("crowd", ReadCrowdSizeFromEnv());
     }
 
-    private const int TestGoblinCount = 500;
-    private const float TestGoblinSpawnRadius = 15f;
-
-    private void SpawnTestMonsters() {
-        if (!_entityDefinitions.TryGet("goblin", out var goblinDefinition)) {
-            Log.Warning("Entity definition 'goblin' not found");
+    private const string CrowdSizeEnvVar = "YGG_CROWD_SIZE";
+    private const int DefaultCrowdSize = 0;
+    private const float CrowdAreaSize = 30f;
+    private const int MaxEntitiesPerSpawnRequest = 20_000;
+    
+    public void SpawnEntities(string definitionId, int count) {
+        count = Math.Clamp(count, 0, MaxEntitiesPerSpawnRequest);
+        if (count <= 0) {
             return;
         }
 
-        var random = new Random();
-        for (var i = 0; i < TestGoblinCount; i++) {
-            var angle = (float)(random.NextDouble() * Math.Tau);
-            var distance = (float)(random.NextDouble() * TestGoblinSpawnRadius);
-            var position = new Vector3(MathF.Cos(angle) * distance, 0f, MathF.Sin(angle) * distance);
-            _entityFactory.Create(goblinDefinition, World, position);
+        if (!_entityDefinitions.TryGet(definitionId, out var definition)) {
+            Log.Warning("Entity definition '{DefinitionId}' not found, cannot spawn {Count} entities", definitionId, count);
+            return;
         }
+
+        var half = CrowdAreaSize / 2f;
+        var random = new Random();
+        for (var i = 0; i < count; i++) {
+            var position = new Vector3(
+                (float)(random.NextDouble() * 2f - 1f) * half,
+                0f,
+                (float)(random.NextDouble() * 2f - 1f) * half);
+            _entityFactory.Create(definition, World, position);
+        }
+
+        Log.Information("Spawned {Count} '{DefinitionId}' entities ({Total} total entities now)",
+            count, definitionId, World.Entities.Count);
+    }
+
+    private static int ReadCrowdSizeFromEnv() {
+        var raw = Environment.GetEnvironmentVariable(CrowdSizeEnvVar);
+        return int.TryParse(raw, out var count) ? count : DefaultCrowdSize;
     }
 
     public void Update(float deltaTime) {

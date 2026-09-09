@@ -1,6 +1,10 @@
 using System.Diagnostics;
 using LiteNetLib;
 using Serilog;
+using Yggdrasilnet.Shared.Network.Packet.Packets;
+
+// ReSharper disable once RedundantUsingDirective
+using System.Linq;
 
 namespace Yggdrasilnet.Server;
 
@@ -17,14 +21,27 @@ public sealed class GameLoop(NetServer netServer, Simulation.Simulation simulati
         var nextStatsLogTime = stopwatch.ElapsedMilliseconds + StatsLogIntervalMs;
         var ticksSinceLastLog = 0;
 
+        var tickTimeTotalMs = 0.0;
+        var tickTimeMaxMs = 0.0;
+        var systemTimeTotalsMs = new Dictionary<string, double>();
+        var tickStopwatch = new Stopwatch();
+
         while (!cancellationToken.IsCancellationRequested) {
             var now = stopwatch.ElapsedMilliseconds;
 
             if (now >= nextTickTime) {
+                tickStopwatch.Restart();
                 netServer.Poll();
                 simulation.Update(deltaTime);
                 BroadcastSnapshot();
+                var tickMs = tickStopwatch.Elapsed.TotalMilliseconds;
+
                 ticksSinceLastLog++;
+                tickTimeTotalMs += tickMs;
+                tickTimeMaxMs = Math.Max(tickTimeMaxMs, tickMs);
+                foreach (var (systemName, systemMs) in simulation.World.LastSystemTimingsMs) {
+                    systemTimeTotalsMs[systemName] = systemTimeTotalsMs.GetValueOrDefault(systemName) + systemMs;
+                }
 
                 nextTickTime += tickIntervalMs;
                 if (stopwatch.ElapsedMilliseconds > nextTickTime + tickIntervalMs) {
@@ -40,23 +57,58 @@ public sealed class GameLoop(NetServer netServer, Simulation.Simulation simulati
             now = stopwatch.ElapsedMilliseconds;
             if (now >= nextStatsLogTime) {
                 var elapsedSeconds = (now - (nextStatsLogTime - StatsLogIntervalMs)) / 1000f;
-                LogStats(ticksSinceLastLog, elapsedSeconds);
+                LogStats(ticksSinceLastLog, elapsedSeconds, tickTimeTotalMs, tickTimeMaxMs, systemTimeTotalsMs);
                 ticksSinceLastLog = 0;
+                tickTimeTotalMs = 0.0;
+                tickTimeMaxMs = 0.0;
+                systemTimeTotalsMs.Clear();
                 nextStatsLogTime = now + StatsLogIntervalMs;
             }
         }
     }
 
-    private void LogStats(int ticksSinceLastLog, float elapsedSeconds) {
+    private void LogStats(int ticksSinceLastLog, float elapsedSeconds, double tickTimeTotalMs, double tickTimeMaxMs,
+        Dictionary<string, double> systemTimeTotalsMs) {
         var actualTps = elapsedSeconds > 0 ? ticksSinceLastLog / elapsedSeconds : 0f;
         var sessions = simulation.Sessions.All;
+        var avgTickMs = ticksSinceLastLog > 0 ? tickTimeTotalMs / ticksSinceLastLog : 0.0;
+        var budgetMs = 1000.0 / tickRate;
 
-        Log.Information("Server status: {ActualTps:F1}/{TargetTps} tps, {PlayerCount} player(s) connected",
-            actualTps, tickRate, sessions.Count);
+        Log.Information(
+            "Server status: {ActualTps:F1}/{TargetTps} tps, {EntityCount} entities, {PlayerCount} player(s), tick avg {AvgTickMs:F2}ms / max {MaxTickMs:F2}ms (budget {BudgetMs:F2}ms)",
+            actualTps, tickRate, simulation.World.Entities.Count, sessions.Count, avgTickMs, tickTimeMaxMs, budgetMs);
+
+        if (ticksSinceLastLog > 0) {
+            foreach (var (systemName, totalMs) in systemTimeTotalsMs.OrderByDescending(kv => kv.Value)) {
+                Log.Information("  {SystemName}: avg {AvgMs:F3}ms/tick", systemName, totalMs / ticksSinceLastLog);
+            }
+        }
 
         foreach (var session in sessions) {
             Log.Information("  Player {PlayerId} (entity {EntityId}) - {EndPoint} - ping {Ping} ms",
                 session.Id, session.EntityId, session.Peer.Address, session.Peer.Ping);
+        }
+
+        BroadcastStats(actualTps, sessions.Count, (float)avgTickMs, (float)tickTimeMaxMs, (float)budgetMs);
+    }
+
+    private void BroadcastStats(float actualTps, int playerCount, float avgTickMs, float maxTickMs, float budgetMs) {
+        var sessions = simulation.Sessions.All;
+        if (sessions.Count == 0) {
+            return;
+        }
+
+        var stats = new StatsPacket {
+            ActualTps = actualTps,
+            TargetTps = tickRate,
+            EntityCount = simulation.World.Entities.Count,
+            PlayerCount = playerCount,
+            AvgTickMs = avgTickMs,
+            MaxTickMs = maxTickMs,
+            BudgetMs = budgetMs,
+        };
+        foreach (var session in sessions) {
+            netServer.Send(session.Peer, stats, DeliveryMethod.Unreliable);
         }
     }
 

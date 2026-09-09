@@ -10,6 +10,8 @@ public sealed class PacketRegistry {
         Register(PacketType.PlayerConnexion, () => new PlayerConnexionPacket());
         Register(PacketType.Snapshot, () => new SnapshotPacket());
         Register(PacketType.Input, () => new InputPacket());
+        Register(PacketType.SpawnEntities, () => new SpawnEntitiesPacket());
+        Register(PacketType.Stats, () => new StatsPacket());
     }
 
     public void Register(PacketType type, Func<IPacket> factory) {

@@ -9,13 +9,13 @@ public sealed class EntityFactory {
         var entity = world.Spawn(position);
 
         foreach (var componentDefinition in definition.Components) {
-            entity.AddComponent(CreateComponent(componentDefinition));
+            entity.AddComponent(CreateComponent(componentDefinition, position));
         }
 
         return entity;
     }
 
-    private static IComponent CreateComponent(ContentEntity.EntityComponentDefinition definition) {
+    private static IComponent CreateComponent(ContentEntity.EntityComponentDefinition definition, Vector3 position) {
         return definition switch {
             ContentEntity.VelocityComponentDefinition velocity => new VelocityComponent { X = velocity.Speed },
             ContentEntity.HealthComponentDefinition health => new HealthComponent { Max = health.Max, Current = health.Max },
@@ -29,8 +29,6 @@ public sealed class EntityFactory {
                 CircleWeight = steering.CircleWeight,
                 WanderWeight = steering.WanderWeight,
                 WanderJitter = steering.WanderJitter,
-                // Randomized per entity so a whole group doesn't move in lockstep:
-                // some circle clockwise, some counter-clockwise, each with its own wander heading.
                 CircleDirection = Random.Shared.NextDouble() < 0.5 ? -1f : 1f,
                 WanderAngle = (float)(Random.Shared.NextDouble() * Math.Tau)
             },
