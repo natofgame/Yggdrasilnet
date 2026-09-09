@@ -5,6 +5,7 @@ using LiteNetLib;
 using LiteNetLib.Utils;
 using Yggdrasilnet.Shared.Network.Packet;
 using Yggdrasilnet.Shared.Network.Packet.Packets;
+using Yggdrasilnet.Shared.Network.Packet.Snapshot;
 
 namespace Yggdrasilnet.FakeClient.LoadTest;
 
@@ -124,6 +125,9 @@ public sealed class LoadTestClient : INetEventListener, IDisposable {
                 case SnapshotPacket snapshot:
                     HandleSnapshot(snapshot);
                     break;
+                case SnapshotChunkPacket snapshotChunk:
+                    HandleSnapshotEntities(snapshotChunk.Entities);
+                    break;
                 case StatsPacket stats:
                     LastStats = stats;
                     break;
@@ -134,11 +138,15 @@ public sealed class LoadTestClient : INetEventListener, IDisposable {
     }
 
     private void HandleSnapshot(SnapshotPacket snapshot) {
+        HandleSnapshotEntities(snapshot.Entities);
+    }
+
+    private void HandleSnapshotEntities(IReadOnlyList<EntitySnapshot> entities) {
         if (_entityId == -1) {
             return;
         }
 
-        foreach (var entity in snapshot.Entities) {
+        foreach (var entity in entities) {
             if (entity.EntityId != _entityId) {
                 continue;
             }

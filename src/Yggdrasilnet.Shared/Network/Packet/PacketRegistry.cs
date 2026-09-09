@@ -9,6 +9,7 @@ public sealed class PacketRegistry {
     public PacketRegistry() {
         Register(PacketType.PlayerConnexion, () => new PlayerConnexionPacket());
         Register(PacketType.Snapshot, () => new SnapshotPacket());
+        Register(PacketType.SnapshotChunk, () => new SnapshotChunkPacket());
         Register(PacketType.Input, () => new InputPacket());
         Register(PacketType.SpawnEntities, () => new SpawnEntitiesPacket());
         Register(PacketType.Stats, () => new StatsPacket());

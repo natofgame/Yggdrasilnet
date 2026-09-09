@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using LiteNetLib;
+using LiteNetLib.Utils;
 using Serilog;
 using Yggdrasilnet.Shared.Network.Packet.Packets;
+using Yggdrasilnet.Shared.Network.Packet.Snapshot;
 
 // ReSharper disable once RedundantUsingDirective
 using System.Linq;
@@ -10,6 +12,9 @@ namespace Yggdrasilnet.Server;
 
 public sealed class GameLoop(NetServer netServer, Simulation.Simulation simulation, int tickRate) {
     private const long StatsLogIntervalMs = 2000;
+    private const int SnapshotChunkTargetBytes = 1000;
+    private const int SnapshotChunkHeaderBytes = 10;
+    private uint _snapshotFrameId;
 
     public void Run(CancellationToken cancellationToken) {
         var deltaTime = 1f / tickRate;
@@ -118,12 +123,54 @@ public sealed class GameLoop(NetServer netServer, Simulation.Simulation simulati
             return;
         }
 
+        var frameId = unchecked(++_snapshotFrameId);
         foreach (var session in sessions) {
             var snapshot = simulation.BuildSnapshotForSession(session, tickRate);
             if (snapshot.Entities.Count == 0) {
                 continue;
             }
-            netServer.Send(session.Peer, snapshot, DeliveryMethod.ReliableOrdered);
+
+            foreach (var chunk in CreateSnapshotChunks(snapshot.Entities, frameId)) {
+                netServer.Send(session.Peer, chunk, DeliveryMethod.Sequenced);
+            }
         }
+    }
+
+    private static IEnumerable<SnapshotChunkPacket> CreateSnapshotChunks(List<EntitySnapshot> entities, uint frameId) {
+        if (entities.Count == 0) {
+            yield break;
+        }
+
+        var currentChunk = new SnapshotChunkPacket {
+            FrameId = frameId,
+            ChunkIndex = 0,
+        };
+        var currentBytes = SnapshotChunkHeaderBytes;
+
+        foreach (var entity in entities) {
+            var entityBytes = EstimateEntityBytes(entity);
+            var wouldOverflow = currentChunk.Entities.Count > 0
+                                && currentBytes + entityBytes > SnapshotChunkTargetBytes;
+            if (wouldOverflow) {
+                yield return currentChunk;
+                currentChunk = new SnapshotChunkPacket {
+                    FrameId = frameId,
+                    ChunkIndex = (ushort)(currentChunk.ChunkIndex + 1),
+                };
+                currentBytes = SnapshotChunkHeaderBytes;
+            }
+
+            currentChunk.Entities.Add(entity);
+            currentBytes += entityBytes;
+        }
+
+        currentChunk.IsLastChunk = true;
+        yield return currentChunk;
+    }
+
+    private static int EstimateEntityBytes(EntitySnapshot entity) {
+        var writer = new NetDataWriter();
+        entity.WriteTo(writer);
+        return writer.Length;
     }
 }
