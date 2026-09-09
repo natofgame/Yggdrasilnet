@@ -13,6 +13,7 @@ namespace Yggdrasilnet.Server;
 public sealed class GameLoop(NetServer netServer, Simulation.Simulation simulation, int tickRate) {
     private const long StatsLogIntervalMs = 2000;
     private const int MaxDetailedPlayerLogs = 8;
+    private const int KeyframeIntervalSeconds = 1;
     private const int SnapshotChunkTargetBytes = 1000;
     private const int SnapshotChunkHeaderBytes = 10;
     private const int SnapshotBaseEntityBytes = 22;
@@ -134,14 +135,17 @@ public sealed class GameLoop(NetServer netServer, Simulation.Simulation simulati
         }
 
         var frameId = unchecked(++_snapshotFrameId);
+        var keyframeIntervalTicks = Math.Max(1, tickRate * KeyframeIntervalSeconds);
+        var isKeyframeTick = simulation.Tick % keyframeIntervalTicks == 0;
         foreach (var session in sessions) {
-            var snapshot = simulation.BuildSnapshotForSession(session, tickRate);
+            var snapshot = simulation.BuildSnapshotForSession(session, tickRate, isKeyframeTick);
             if (snapshot.Entities.Count == 0) {
                 continue;
             }
 
             foreach (var chunk in CreateSnapshotChunks(snapshot.Entities, frameId)) {
-                netServer.Send(session.Peer, chunk, DeliveryMethod.Sequenced);
+                var delivery = isKeyframeTick ? DeliveryMethod.ReliableOrdered : DeliveryMethod.Sequenced;
+                netServer.Send(session.Peer, chunk, delivery);
             }
         }
     }

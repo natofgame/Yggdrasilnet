@@ -57,6 +57,8 @@ public sealed class Simulation : ISimulationContext {
     private const float SnapshotGridCellSize = 20f;
     private const int MaxStationaryEntityHz = 2;
     private const float StationarySpeedSquaredEpsilon = 0.0001f;
+    private const float PositionDeltaThreshold = 0.10f;
+    private const float VelocityDeltaThreshold = 0.05f;
 
     private static readonly SnapshotDistanceTier[] SnapshotDistanceTiers = [
         new(15f, 20),
@@ -155,7 +157,7 @@ public sealed class Simulation : ISimulationContext {
         Log.Information("Player {PlayerId} disconnected: {EndPoint} ({Reason})", session!.Id, peer.Address, info.Reason);
     }
 
-    public SnapshotPacket BuildSnapshotForSession(PlayerSession session, int tickRate) {
+    public SnapshotPacket BuildSnapshotForSession(PlayerSession session, int tickRate, bool forceFullSnapshot) {
         var packet = new SnapshotPacket();
         if (session.EntityId == -1) {
             return packet;
@@ -167,9 +169,8 @@ public sealed class Simulation : ISimulationContext {
 
         var observerPosition = Flat(ownerEntity.Position);
         packet.Entities.Add(BuildEntitySnapshot(ownerEntity));
-
-        var sentTicks = session.LastSentEntityTicks;
-        sentTicks[ownerEntity.Id] = Tick;
+        var sentStates = session.LastSentEntities;
+        UpsertSentState(sentStates, ownerEntity, Tick, forceFullSnapshot);
 
         EnsureInterestGrid();
         var maxDistance = SnapshotDistanceTiers[^1].MaxDistance;
@@ -181,7 +182,7 @@ public sealed class Simulation : ISimulationContext {
             var distanceSquared = Vector2.DistanceSquared(observerPosition, Flat(entity.Position));
             var targetHz = ResolveTargetHz(distanceSquared);
             if (targetHz <= 0) {
-                sentTicks.Remove(entity.Id);
+                sentStates.Remove(entity.Id);
                 continue;
             }
 
@@ -189,11 +190,17 @@ public sealed class Simulation : ISimulationContext {
                 targetHz = Math.Min(targetHz, MaxStationaryEntityHz);
             }
 
-            if (!IsEntityDueForSend(sentTicks, entity.Id, targetHz, tickRate, Tick)) {
+            sentStates.TryGetValue(entity.Id, out var state);
+            if (!forceFullSnapshot && !IsEntityDueForSend(state, targetHz, tickRate, Tick)) {
+                continue;
+            }
+
+            if (!forceFullSnapshot && state != null && !HasSignificantChange(entity, state)) {
                 continue;
             }
 
             packet.Entities.Add(BuildEntitySnapshot(entity));
+            UpsertSentState(sentStates, entity, Tick, forceFullSnapshot);
         }
 
         return packet;
@@ -230,17 +237,15 @@ public sealed class Simulation : ISimulationContext {
         return 0;
     }
 
-    private static bool IsEntityDueForSend(Dictionary<int, long> sentTicks, int entityId, int targetHz, int tickRate, long currentTick) {
+    private static bool IsEntityDueForSend(SentEntityState? state, int targetHz, int tickRate, long currentTick) {
+        if (state == null) {
+            return true;
+        }
+
         var safeTickRate = Math.Max(1, tickRate);
         var safeHz = Math.Max(1, targetHz);
         var intervalTicks = Math.Max(1, (int)MathF.Round(safeTickRate / (float)safeHz));
-
-        if (sentTicks.TryGetValue(entityId, out var lastTick) && currentTick - lastTick < intervalTicks) {
-            return false;
-        }
-
-        sentTicks[entityId] = currentTick;
-        return true;
+        return currentTick - state.LastSentTick >= intervalTicks;
     }
 
     private static bool IsStationary(World.Entity entity) {
@@ -250,6 +255,39 @@ public sealed class Simulation : ISimulationContext {
 
         var speedSquared = velocity.X * velocity.X + velocity.Y * velocity.Y + velocity.Z * velocity.Z;
         return speedSquared <= StationarySpeedSquaredEpsilon;
+    }
+
+    private static bool HasSignificantChange(World.Entity entity, SentEntityState state) {
+        var positionDeltaSquared = Vector3.DistanceSquared(entity.Position, state.Position);
+        if (positionDeltaSquared >= PositionDeltaThreshold * PositionDeltaThreshold) {
+            return true;
+        }
+
+        var velocity = ReadVelocity(entity);
+        var velocityDeltaSquared = Vector3.DistanceSquared(velocity, state.Velocity);
+        return velocityDeltaSquared >= VelocityDeltaThreshold * VelocityDeltaThreshold;
+    }
+
+    private static void UpsertSentState(Dictionary<int, SentEntityState> sentStates, World.Entity entity, long tick, bool fullSnapshot) {
+        if (!sentStates.TryGetValue(entity.Id, out var state)) {
+            state = new SentEntityState();
+            sentStates[entity.Id] = state;
+        }
+
+        state.Position = entity.Position;
+        state.Velocity = ReadVelocity(entity);
+        state.LastSentTick = tick;
+        if (fullSnapshot) {
+            state.LastFullSentTick = tick;
+        }
+    }
+
+    private static Vector3 ReadVelocity(World.Entity entity) {
+        if (!entity.TryGetComponent<VelocityComponent>(out var velocity)) {
+            return Vector3.Zero;
+        }
+
+        return new Vector3(velocity.X, velocity.Y, velocity.Z);
     }
 
     private void EnsureInterestGrid() {
