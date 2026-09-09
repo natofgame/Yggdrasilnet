@@ -43,11 +43,21 @@ public sealed class Simulation : ISimulationContext {
         SpawnTestMonsters();
     }
 
+    private const int TestGoblinCount = 500;
+    private const float TestGoblinSpawnRadius = 15f;
+
     private void SpawnTestMonsters() {
-        if (_entityDefinitions.TryGet("goblin", out var goblinDefinition)) {
-            _entityFactory.Create(goblinDefinition, World, new Vector3(3f, 0f, 0f));
-        } else {
+        if (!_entityDefinitions.TryGet("goblin", out var goblinDefinition)) {
             Log.Warning("Entity definition 'goblin' not found");
+            return;
+        }
+
+        var random = new Random();
+        for (var i = 0; i < TestGoblinCount; i++) {
+            var angle = (float)(random.NextDouble() * Math.Tau);
+            var distance = (float)(random.NextDouble() * TestGoblinSpawnRadius);
+            var position = new Vector3(MathF.Cos(angle) * distance, 0f, MathF.Sin(angle) * distance);
+            _entityFactory.Create(goblinDefinition, World, position);
         }
     }
 

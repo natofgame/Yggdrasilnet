@@ -45,7 +45,8 @@ public sealed class World {
     }
 
     public void Load() {
-        AddSystem(new MovementSystem());
         AddSystem(new PlayerMovementSystem());
+        AddSystem(new SteeringSystem());
+        AddSystem(new MovementSystem());
     }
 }

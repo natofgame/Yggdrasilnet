@@ -1,7 +1,18 @@
 {
   "id": "goblin",
   "components": [
-    { "type": "velocity", "speed": 2.5 },
-    { "type": "health", "max": 30 }
+    { "type": "velocity", "speed": 0 },
+    { "type": "health", "max": 30 },
+    {
+      "type": "steering",
+      "speed": 2.5,
+      "avoidRadius": 3,
+      "avoidWeight": 0.7,
+      "seekWeight": 1.0,
+      "circleRadius": 5.0,
+      "circleWeight": 0.8,
+      "wanderWeight": 0.5,
+      "wanderJitter": 3
+    }
   ]
 }

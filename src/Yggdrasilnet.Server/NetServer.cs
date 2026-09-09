@@ -22,7 +22,9 @@ public sealed class NetServer : INetEventListener {
     }
 
     public void Start(int port) {
-        _netManager.Start(port);
+        if (!_netManager.Start(port)) {
+            throw new InvalidOperationException($"Unable to bind UDP server on port {port}.");
+        }
         Log.Information("Server listening on port {Port}", port);
     }
 
