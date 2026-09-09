@@ -2,16 +2,6 @@
   "id": "goblin",
   "components": [
     { "type": "velocity", "speed": 0 },
-    { "type": "health", "max": 30 },
-    {
-      "type": "guard",
-      "speed": 2.5,
-      "neighborAvoidRadius": 0.6,
-      "neighborAvoidWeight": 1,
-      "playerAvoidRadius": 5,
-      "playerAvoidWeight": 4.0,
-      "returnWeight": 2.0,
-      "settleRadius": 0.15
-    }
+    { "type": "health", "max": 30 }
   ]
 }

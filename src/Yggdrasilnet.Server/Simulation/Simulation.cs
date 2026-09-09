@@ -16,6 +16,8 @@ using Yggdrasilnet.Shared.Network.Packet.Snapshot;
 namespace Yggdrasilnet.Server.Simulation;
 
 public sealed class Simulation : ISimulationContext {
+    private readonly record struct SnapshotDistanceTier(float MaxDistance, int TargetHz);
+
     public ConcurrentQueue<ISimulationEvent> IncomingEvents { get; } = new();
 
     private readonly PacketDispatcher<ISimulationContext> _dispatcher = new();
@@ -24,6 +26,8 @@ public sealed class Simulation : ISimulationContext {
 
     private readonly DefinitionRegistry<ContentEntity.EntityDefinition> _entityDefinitions = new();
     private readonly EntityFactory _entityFactory = new();
+    private readonly Dictionary<(int X, int Y), List<World.Entity>> _interestGrid = new();
+    private long _interestGridBuiltAtTick = -1;
 
     public NetServer? NetServer { get; set; }
     
@@ -48,6 +52,13 @@ public sealed class Simulation : ISimulationContext {
     private const int DefaultCrowdSize = 0;
     private const float CrowdAreaSize = 30f;
     private const int MaxEntitiesPerSpawnRequest = 20_000;
+    private const float SnapshotGridCellSize = 20f;
+
+    private static readonly SnapshotDistanceTier[] SnapshotDistanceTiers = [
+        new(25f, 20),
+        new(60f, 10),
+        new(120f, 2),
+    ];
     
     public void SpawnEntities(string definitionId, int count) {
         count = Math.Clamp(count, 0, MaxEntitiesPerSpawnRequest);
@@ -137,27 +148,130 @@ public sealed class Simulation : ISimulationContext {
         Log.Information("Player {PlayerId} disconnected: {EndPoint} ({Reason})", session!.Id, peer.Address, info.Reason);
     }
 
-    public SnapshotPacket BuildSnapshot() {
+    public SnapshotPacket BuildSnapshotForSession(PlayerSession session, int tickRate) {
         var packet = new SnapshotPacket();
-        foreach (var entity in World.Entities) {
-            var snapshot = new EntitySnapshot {
-                EntityId =  entity.Id,
-                PositionX = entity.Position.X,
-                PositionY = entity.Position.Y,
-                PositionZ = entity.Position.Z
-            };
-            foreach (var component in entity.Components) {
-                if (component is INetworkedComponent networked) {
-                    snapshot.Components.Add(networked);
-                }
+        if (session.EntityId == -1) {
+            return packet;
+        }
+
+        if (!World.TryGetEntity(session.EntityId, out var ownerEntity)) {
+            return packet;
+        }
+
+        var observerPosition = Flat(ownerEntity.Position);
+        packet.Entities.Add(BuildEntitySnapshot(ownerEntity));
+
+        var sentTicks = session.LastSentEntityTicks;
+        sentTicks[ownerEntity.Id] = Tick;
+
+        EnsureInterestGrid();
+        var maxDistance = SnapshotDistanceTiers[^1].MaxDistance;
+        foreach (var entity in EnumerateNearbyEntities(observerPosition, maxDistance)) {
+            if (entity.Id == ownerEntity.Id) {
+                continue;
             }
-            if (entity.TryGetComponent<InputComponent>(out var input)) {
-                snapshot.LastInputSequence = input.LastSequence;
+
+            var distance = Vector2.Distance(observerPosition, Flat(entity.Position));
+            var targetHz = ResolveTargetHz(distance);
+            if (targetHz <= 0) {
+                sentTicks.Remove(entity.Id);
+                continue;
             }
-            
-            packet.Entities.Add(snapshot);
+
+            if (!IsEntityDueForSend(sentTicks, entity.Id, targetHz, tickRate, Tick)) {
+                continue;
+            }
+
+            packet.Entities.Add(BuildEntitySnapshot(entity));
         }
 
         return packet;
     }
+
+    private static EntitySnapshot BuildEntitySnapshot(World.Entity entity) {
+        var snapshot = new EntitySnapshot {
+            EntityId = entity.Id,
+            PositionX = entity.Position.X,
+            PositionY = entity.Position.Y,
+            PositionZ = entity.Position.Z
+        };
+
+        foreach (var component in entity.Components) {
+            if (component is INetworkedComponent networked) {
+                snapshot.Components.Add(networked);
+            }
+        }
+
+        if (entity.TryGetComponent<InputComponent>(out var input)) {
+            snapshot.LastInputSequence = input.LastSequence;
+        }
+
+        return snapshot;
+    }
+
+    private int ResolveTargetHz(float distance) {
+        foreach (var tier in SnapshotDistanceTiers) {
+            if (distance <= tier.MaxDistance) {
+                return tier.TargetHz;
+            }
+        }
+
+        return 0;
+    }
+
+    private static bool IsEntityDueForSend(Dictionary<int, long> sentTicks, int entityId, int targetHz, int tickRate, long currentTick) {
+        var safeTickRate = Math.Max(1, tickRate);
+        var safeHz = Math.Max(1, targetHz);
+        var intervalTicks = Math.Max(1, (int)MathF.Round(safeTickRate / (float)safeHz));
+
+        if (sentTicks.TryGetValue(entityId, out var lastTick) && currentTick - lastTick < intervalTicks) {
+            return false;
+        }
+
+        sentTicks[entityId] = currentTick;
+        return true;
+    }
+
+    private void EnsureInterestGrid() {
+        if (_interestGridBuiltAtTick == Tick) {
+            return;
+        }
+
+        _interestGrid.Clear();
+        foreach (var entity in World.Entities) {
+            var key = GetGridCell(Flat(entity.Position));
+            if (!_interestGrid.TryGetValue(key, out var entities)) {
+                entities = [];
+                _interestGrid[key] = entities;
+            }
+
+            entities.Add(entity);
+        }
+
+        _interestGridBuiltAtTick = Tick;
+    }
+
+    private IEnumerable<World.Entity> EnumerateNearbyEntities(Vector2 center, float radius) {
+        var (centerX, centerY) = GetGridCell(center);
+        var cellRadius = (int)MathF.Ceiling(radius / SnapshotGridCellSize);
+        for (var y = centerY - cellRadius; y <= centerY + cellRadius; y++) {
+            for (var x = centerX - cellRadius; x <= centerX + cellRadius; x++) {
+                if (!_interestGrid.TryGetValue((x, y), out var entities)) {
+                    continue;
+                }
+
+                foreach (var entity in entities) {
+                    yield return entity;
+                }
+            }
+        }
+    }
+
+    private static (int X, int Y) GetGridCell(Vector2 position) {
+        var x = (int)MathF.Floor(position.X / SnapshotGridCellSize);
+        var y = (int)MathF.Floor(position.Y / SnapshotGridCellSize);
+        return (x, y);
+    }
+
+    private static Vector2 Flat(Vector3 position) => new(position.X, position.Z);
 }

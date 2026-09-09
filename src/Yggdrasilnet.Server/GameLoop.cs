@@ -118,8 +118,11 @@ public sealed class GameLoop(NetServer netServer, Simulation.Simulation simulati
             return;
         }
 
-        var snapshot = simulation.BuildSnapshot();
         foreach (var session in sessions) {
+            var snapshot = simulation.BuildSnapshotForSession(session, tickRate);
+            if (snapshot.Entities.Count == 0) {
+                continue;
+            }
             netServer.Send(session.Peer, snapshot, DeliveryMethod.ReliableOrdered);
         }
     }
