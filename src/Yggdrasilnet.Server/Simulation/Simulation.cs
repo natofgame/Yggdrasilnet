@@ -55,11 +55,13 @@ public sealed class Simulation : ISimulationContext {
     private const float CrowdAreaSize = 30f;
     private const int MaxEntitiesPerSpawnRequest = 20_000;
     private const float SnapshotGridCellSize = 20f;
+    private const int MaxStationaryEntityHz = 2;
+    private const float StationarySpeedSquaredEpsilon = 0.0001f;
 
     private static readonly SnapshotDistanceTier[] SnapshotDistanceTiers = [
-        new(25f, 20),
-        new(60f, 10),
-        new(120f, 2),
+        new(15f, 20),
+        new(35f, 8),
+        new(60f, 2),
     ];
 
     private static readonly SnapshotDistanceTierSquared[] SnapshotDistanceTiersSquared =
@@ -183,6 +185,10 @@ public sealed class Simulation : ISimulationContext {
                 continue;
             }
 
+            if (IsStationary(entity)) {
+                targetHz = Math.Min(targetHz, MaxStationaryEntityHz);
+            }
+
             if (!IsEntityDueForSend(sentTicks, entity.Id, targetHz, tickRate, Tick)) {
                 continue;
             }
@@ -235,6 +241,15 @@ public sealed class Simulation : ISimulationContext {
 
         sentTicks[entityId] = currentTick;
         return true;
+    }
+
+    private static bool IsStationary(World.Entity entity) {
+        if (!entity.TryGetComponent<VelocityComponent>(out var velocity)) {
+            return false;
+        }
+
+        var speedSquared = velocity.X * velocity.X + velocity.Y * velocity.Y + velocity.Z * velocity.Z;
+        return speedSquared <= StationarySpeedSquaredEpsilon;
     }
 
     private void EnsureInterestGrid() {

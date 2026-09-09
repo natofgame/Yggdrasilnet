@@ -12,6 +12,7 @@ namespace Yggdrasilnet.Server;
 
 public sealed class GameLoop(NetServer netServer, Simulation.Simulation simulation, int tickRate) {
     private const long StatsLogIntervalMs = 2000;
+    private const int MaxDetailedPlayerLogs = 8;
     private const int SnapshotChunkTargetBytes = 1000;
     private const int SnapshotChunkHeaderBytes = 10;
     private const int SnapshotBaseEntityBytes = 22;
@@ -91,9 +92,16 @@ public sealed class GameLoop(NetServer netServer, Simulation.Simulation simulati
             }
         }
 
-        foreach (var session in sessions) {
-            Log.Information("  Player {PlayerId} (entity {EntityId}) - {EndPoint} - ping {Ping} ms",
-                session.Id, session.EntityId, session.Peer.Address, session.Peer.Ping);
+        if (sessions.Count <= MaxDetailedPlayerLogs) {
+            foreach (var session in sessions) {
+                Log.Information("  Player {PlayerId} (entity {EntityId}) - {EndPoint} - ping {Ping} ms",
+                    session.Id, session.EntityId, session.Peer.Address, session.Peer.Ping);
+            }
+        } else {
+            var avgPing = sessions.Average(s => s.Peer.Ping);
+            var maxPing = sessions.Max(s => s.Peer.Ping);
+            Log.Information("  Players: {PlayerCount} connected, ping avg {AvgPing:F1} ms / max {MaxPing} ms",
+                sessions.Count, avgPing, maxPing);
         }
 
         BroadcastStats(actualTps, sessions.Count, (float)avgTickMs, (float)tickTimeMaxMs, (float)budgetMs);
