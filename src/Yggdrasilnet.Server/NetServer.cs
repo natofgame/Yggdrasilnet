@@ -13,6 +13,7 @@ public sealed class NetServer : INetEventListener {
     private readonly NetManager _netManager;
     private readonly PacketRegistry _packetRegistry = new();
     private readonly ConcurrentQueue<ISimulationEvent> _simulationEvents;
+    private readonly NetDataWriter _sendWriter = new();
 
     public NetServer(ConcurrentQueue<ISimulationEvent> worldEvents) {
         _simulationEvents = worldEvents;
@@ -37,9 +38,11 @@ public sealed class NetServer : INetEventListener {
     }
 
     public void Send<T>(NetPeer peer, T packet, DeliveryMethod method = DeliveryMethod.ReliableOrdered) where T : IPacket {
-        var writer = new NetDataWriter();
-        _packetRegistry.Write(writer, packet);
-        peer.Send(writer, method);
+        lock (_sendWriter) {
+            _sendWriter.Reset();
+            _packetRegistry.Write(_sendWriter, packet);
+            peer.Send(_sendWriter, method);
+        }
     }
 
     public void OnPeerConnected(NetPeer peer) {

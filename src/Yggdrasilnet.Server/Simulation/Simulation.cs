@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Numerics;
 using LiteNetLib;
 using Serilog;
@@ -17,6 +18,7 @@ namespace Yggdrasilnet.Server.Simulation;
 
 public sealed class Simulation : ISimulationContext {
     private readonly record struct SnapshotDistanceTier(float MaxDistance, int TargetHz);
+    private readonly record struct SnapshotDistanceTierSquared(float MaxDistanceSquared, int TargetHz);
 
     public ConcurrentQueue<ISimulationEvent> IncomingEvents { get; } = new();
 
@@ -59,6 +61,9 @@ public sealed class Simulation : ISimulationContext {
         new(60f, 10),
         new(120f, 2),
     ];
+
+    private static readonly SnapshotDistanceTierSquared[] SnapshotDistanceTiersSquared =
+        SnapshotDistanceTiers.Select(tier => new SnapshotDistanceTierSquared(tier.MaxDistance * tier.MaxDistance, tier.TargetHz)).ToArray();
     
     public void SpawnEntities(string definitionId, int count) {
         count = Math.Clamp(count, 0, MaxEntitiesPerSpawnRequest);
@@ -171,8 +176,8 @@ public sealed class Simulation : ISimulationContext {
                 continue;
             }
 
-            var distance = Vector2.Distance(observerPosition, Flat(entity.Position));
-            var targetHz = ResolveTargetHz(distance);
+            var distanceSquared = Vector2.DistanceSquared(observerPosition, Flat(entity.Position));
+            var targetHz = ResolveTargetHz(distanceSquared);
             if (targetHz <= 0) {
                 sentTicks.Remove(entity.Id);
                 continue;
@@ -209,9 +214,9 @@ public sealed class Simulation : ISimulationContext {
         return snapshot;
     }
 
-    private int ResolveTargetHz(float distance) {
-        foreach (var tier in SnapshotDistanceTiers) {
-            if (distance <= tier.MaxDistance) {
+    private int ResolveTargetHz(float distanceSquared) {
+        foreach (var tier in SnapshotDistanceTiersSquared) {
+            if (distanceSquared <= tier.MaxDistanceSquared) {
                 return tier.TargetHz;
             }
         }

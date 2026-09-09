@@ -14,6 +14,8 @@ public sealed class GameLoop(NetServer netServer, Simulation.Simulation simulati
     private const long StatsLogIntervalMs = 2000;
     private const int SnapshotChunkTargetBytes = 1000;
     private const int SnapshotChunkHeaderBytes = 10;
+    private const int SnapshotBaseEntityBytes = 22;
+    private const int SnapshotVelocityComponentBytes = 13;
     private uint _snapshotFrameId;
 
     public void Run(CancellationToken cancellationToken) {
@@ -169,8 +171,14 @@ public sealed class GameLoop(NetServer netServer, Simulation.Simulation simulati
     }
 
     private static int EstimateEntityBytes(EntitySnapshot entity) {
-        var writer = new NetDataWriter();
-        entity.WriteTo(writer);
-        return writer.Length;
+        var size = SnapshotBaseEntityBytes;
+        foreach (var component in entity.Components) {
+            size += component.Type switch {
+                NetworkedComponentType.Velocity => SnapshotVelocityComponentBytes,
+                _ => 0
+            };
+        }
+
+        return size;
     }
 }
