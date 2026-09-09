@@ -6,4 +6,5 @@ public interface ISimulationContext {
     long Tick { get; }
     PlayerSessionRegistry Sessions { get; }
     World.World World { get; }
+    void SpawnEntities(string definitionId, int count);
 }

@@ -8,6 +8,13 @@ public sealed class SteeringSystem : ISystem {
     public void Update(World world, float deltaTime) {
         var steered = world.Query<SteeringComponent>().ToList();
         var targets = world.Query<InputComponent>().ToList();
+        if (steered.Count == 0) {
+            return;
+        }
+
+        var maxAvoidRadius = steered.Max(pair => pair.Component.AvoidRadius);
+        var cellSize = MathF.Max(0.1f, maxAvoidRadius);
+        var steeringGrid = BuildSteeringGrid(steered, cellSize);
 
         foreach (var (entity, steering) in steered) {
             if (!entity.TryGetComponent<VelocityComponent>(out var velocity)) {
@@ -23,6 +30,7 @@ public sealed class SteeringSystem : ISystem {
 
                 if (distance > 0.0001f) {
                     var direction = toTarget / distance;
+
                     steer += direction * steering.SeekWeight;
 
                     var radialError = distance - steering.CircleRadius;
@@ -39,7 +47,7 @@ public sealed class SteeringSystem : ISystem {
                 }
             }
 
-            foreach (var (other, _) in steered) {
+            foreach (var (other, _) in EnumerateNearby(steeringGrid, cellSize, entity.Position, steering.AvoidRadius)) {
                 if (other.Id == entity.Id) {
                     continue;
                 }
@@ -83,6 +91,51 @@ public sealed class SteeringSystem : ISystem {
         }
 
         return nearest;
+    }
+
+    private static Dictionary<(int X, int Y), List<(Entity Entity, SteeringComponent Component)>> BuildSteeringGrid(
+        List<(Entity Entity, SteeringComponent Component)> steered,
+        float cellSize
+    ) {
+        var grid = new Dictionary<(int X, int Y), List<(Entity Entity, SteeringComponent Component)>>();
+        foreach (var pair in steered) {
+            var key = GetCellKey(Flat(pair.Entity.Position), cellSize);
+            if (!grid.TryGetValue(key, out var bucket)) {
+                bucket = [];
+                grid[key] = bucket;
+            }
+
+            bucket.Add(pair);
+        }
+
+        return grid;
+    }
+
+    private static IEnumerable<(Entity Entity, SteeringComponent Component)> EnumerateNearby(
+        Dictionary<(int X, int Y), List<(Entity Entity, SteeringComponent Component)>> grid,
+        float cellSize,
+        Vector3 center,
+        float radius
+    ) {
+        var (centerX, centerY) = GetCellKey(Flat(center), cellSize);
+        var cellRadius = (int)MathF.Ceiling(radius / cellSize);
+        for (var y = centerY - cellRadius; y <= centerY + cellRadius; y++) {
+            for (var x = centerX - cellRadius; x <= centerX + cellRadius; x++) {
+                if (!grid.TryGetValue((x, y), out var bucket)) {
+                    continue;
+                }
+
+                foreach (var entry in bucket) {
+                    yield return entry;
+                }
+            }
+        }
+    }
+
+    private static (int X, int Y) GetCellKey(Vector2 position, float cellSize) {
+        var x = (int)MathF.Floor(position.X / cellSize);
+        var y = (int)MathF.Floor(position.Y / cellSize);
+        return (x, y);
     }
 
     private static Vector2 Flat(Vector3 position) => new(position.X, position.Z);
