@@ -52,11 +52,10 @@ public sealed class SnapshotBroadcastService(NetServer netServer, Simulation.Sim
         var chunkTargetBytes = ResolveChunkTargetBytes(peer, delivery);
         var maxEntityBudget = chunkTargetBytes - SnapshotChunkHeaderBytes;
 
-        var currentChunk = _chunk;
-        currentChunk.FrameId = frameId;
-        currentChunk.ChunkIndex = 0;
-        currentChunk.IsLastChunk = false;
-        currentChunk.Entities.Clear();
+        _chunk.FrameId = frameId;
+        _chunk.ChunkIndex = 0;
+        _chunk.IsLastChunk = false;
+        _chunk.Entities.Clear();
         var currentBytes = SnapshotChunkHeaderBytes;
 
         try {
@@ -67,25 +66,27 @@ public sealed class SnapshotBroadcastService(NetServer netServer, Simulation.Sim
                     continue;
                 }
 
-                var wouldOverflow = currentChunk.Entities.Count > 0
+                var wouldOverflow = _chunk.Entities.Count > 0
                                     && currentBytes + entityBytes > chunkTargetBytes;
                 if (wouldOverflow) {
-                    SendChunk(peer, currentChunk, delivery, ref metrics);
-                    currentChunk.Entities.Clear();
-                    currentChunk.ChunkIndex++;
+                    SendChunk(peer, _chunk, delivery, ref metrics);
+                    _chunk.Entities.Clear();
+                    _chunk.ChunkIndex++;
                     currentBytes = SnapshotChunkHeaderBytes;
                 }
 
-                currentChunk.Entities.Add(entity);
+                _chunk.Entities.Add(entity);
                 currentBytes += entityBytes;
             }
 
-            if (currentChunk.Entities.Count > 0) {
-                currentChunk.IsLastChunk = true;
-                SendChunk(peer, currentChunk, delivery, ref metrics);
+            if (_chunk.Entities.Count <= 0) {
+                return;
             }
+
+            _chunk.IsLastChunk = true;
+            SendChunk(peer, _chunk, delivery, ref metrics);
         } finally {
-            currentChunk.Entities.Clear();
+            _chunk.Entities.Clear();
         }
     }
 
@@ -109,15 +110,10 @@ public sealed class SnapshotBroadcastService(NetServer netServer, Simulation.Sim
             return entity.EstimatedBytes;
         }
 
-        var size = SnapshotBaseEntityBytes;
-        foreach (var component in entity.Components) {
-            size += component.Type switch {
-                NetworkedComponentType.Velocity => SnapshotVelocityComponentBytes,
-                _ => 0
-            };
-        }
-
-        return size;
+        return SnapshotBaseEntityBytes + entity.Components.Sum(component => component.Type switch {
+            NetworkedComponentType.Velocity => SnapshotVelocityComponentBytes,
+            _ => 0
+        });
     }
 }
 
