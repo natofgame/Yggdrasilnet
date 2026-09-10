@@ -1,9 +1,12 @@
 using Serilog;
+using Serilog.Sinks.SystemConsole.Themes;
 using Yggdrasilnet.FakeClient.LoadTest;
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
-    .WriteTo.Console()
+    .WriteTo.Console(
+        outputTemplate: "{Timestamp:HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}",
+        theme: AnsiConsoleTheme.Code)
     .CreateLogger();
 
 var options = LoadTestOptions.Parse(args);
