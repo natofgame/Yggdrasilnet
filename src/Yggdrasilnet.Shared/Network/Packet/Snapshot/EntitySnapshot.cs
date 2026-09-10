@@ -11,6 +11,8 @@ public sealed class EntitySnapshot {
     public int EstimatedBytes { get; set; }
 
     public uint LastInputSequence { get; set; }
+    
+    public byte DefinitionId { get; set; }
 
     public void WriteTo(NetDataWriter writer) {
         writer.Put(EntityId);
@@ -18,6 +20,7 @@ public sealed class EntitySnapshot {
         writer.Put(PositionY);
         writer.Put(PositionZ);
         writer.Put(LastInputSequence);
+        writer.Put(DefinitionId);
 
         writer.Put((ushort)Components.Count);
         foreach (var component in Components) {
@@ -33,6 +36,7 @@ public sealed class EntitySnapshot {
             PositionY = reader.GetFloat(),
             PositionZ = reader.GetFloat(),
             LastInputSequence = reader.GetUInt(),
+            DefinitionId = reader.GetByte(),
         };
 
         var count = reader.GetUShort();

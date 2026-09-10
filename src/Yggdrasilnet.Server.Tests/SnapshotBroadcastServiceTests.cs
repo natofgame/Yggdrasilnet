@@ -48,7 +48,7 @@ public sealed class SnapshotBroadcastServiceTests {
             }
             for (var i = 0; i < sends.Length; i++) {
                 Assert.Equal(retained[i], SerializeEntities(sends[i].Entities));
-                Assert.All(sends[i].Entities, entity => Assert.Equal(35, entity.EstimatedBytes));
+                Assert.All(sends[i].Entities, entity => Assert.Equal(36, entity.EstimatedBytes));
             }
             Assert.Equal(220, sends[0].Entities.Count);
             Assert.Equal(220, sends[1].Entities.Count);
@@ -145,7 +145,7 @@ public sealed class SnapshotBroadcastServiceTests {
             PositionY = -offset - i - 0.5f,
             PositionZ = i * 2 + 0.75f,
             LastInputSequence = (uint)(offset * 10 + i),
-            EstimatedBytes = 35,
+            EstimatedBytes = 36,
             Components = [new VelocityComponent { X = offset + i, Y = -i - 0.25f, Z = offset * 2 + i }]
         }).ToList();
     }
@@ -153,7 +153,7 @@ public sealed class SnapshotBroadcastServiceTests {
     private static EntitySnapshot Oversized(int id) {
         return new EntitySnapshot {
             EntityId = id,
-            EstimatedBytes = 22 + 100 * 13,
+            EstimatedBytes = 23 + 100 * 13,
             Components = Enumerable.Range(0, 100)
                 .Select(i => (INetworkedComponent)new VelocityComponent { X = i, Y = -i, Z = id }).ToList()
         };
@@ -162,7 +162,7 @@ public sealed class SnapshotBroadcastServiceTests {
     private static ExpectedSend NewSend(LoopbackPeers network, int recipient, uint frameId,
         DeliveryMethod delivery, List<EntitySnapshot> entities) {
         var target = Math.Min(1000, network.Peers[recipient].GetMaxSinglePacketSize(delivery) - 96);
-        var entitiesPerChunk = (target - 10) / 35;
+        var entitiesPerChunk = (target - 10) / 36;
         Assert.True(entitiesPerChunk > 0);
         var chunks = entities.Chunk(entitiesPerChunk).ToArray();
         var bytes = chunks.Select((chunk, index) => Serialize(new SnapshotChunkPacket {
@@ -187,11 +187,11 @@ public sealed class SnapshotBroadcastServiceTests {
             Assert.Equal(i == received.Length - 1, actual.Packet.IsLastChunk);
             Assert.Equal(expected.Bytes[i], actual.Bytes);
             Assert.InRange(actual.Bytes.Length, 11, expected.TargetBytes);
-            Assert.Equal(10 + actual.Packet.Entities.Count * 35, actual.Bytes.Length);
+            Assert.Equal(10 + actual.Packet.Entities.Count * 36, actual.Bytes.Length);
             Assert.NotEmpty(actual.Packet.Entities);
             if (i < received.Length - 1) {
                 Assert.Equal(expected.EntitiesPerChunk, actual.Packet.Entities.Count);
-                Assert.True(actual.Bytes.Length + 35 > expected.TargetBytes);
+                Assert.True(actual.Bytes.Length + 36 > expected.TargetBytes);
             }
         }
         Assert.Equal(expected.Entities.Select(entity => entity.EntityId),

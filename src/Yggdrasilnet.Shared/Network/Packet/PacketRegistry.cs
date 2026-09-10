@@ -13,6 +13,7 @@ public sealed class PacketRegistry {
         Register(PacketType.Input, () => new InputPacket());
         Register(PacketType.SpawnEntities, () => new SpawnEntitiesPacket());
         Register(PacketType.Stats, () => new StatsPacket());
+        Register(PacketType.EntityDefinitions, () => new EntityDefinitionsPacket());
     }
 
     public void Register(PacketType type, Func<IPacket> factory) {

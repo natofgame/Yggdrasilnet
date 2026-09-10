@@ -6,6 +6,8 @@ namespace Yggdrasilnet.Server.Simulation.World;
 public sealed class Entity {
     public int Id { get; }
     public Vector3 Position { get; set; }
+    
+    public byte DefinitionIndex { get; internal set; }
 
     private readonly Dictionary<Type, IComponent> _components = new();
     internal Action<Type>? ComponentStructureChanged { get; set; }

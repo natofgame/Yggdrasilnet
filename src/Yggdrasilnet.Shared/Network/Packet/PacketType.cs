@@ -7,4 +7,5 @@ public enum PacketType : byte {
     SpawnEntities = 3,
     Stats = 4,
     SnapshotChunk = 5,
+    EntityDefinitions = 6,
 }

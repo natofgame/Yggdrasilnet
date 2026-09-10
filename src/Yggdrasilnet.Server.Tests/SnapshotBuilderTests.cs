@@ -395,7 +395,7 @@ public sealed class SnapshotBuilderTests {
         var retained = builder.BuildSnapshotForSession(session, 1, 60, true);
         var retainedEntity = Assert.Single(retained.Entities);
         Assert.Same(oldVelocity, Assert.Single(retainedEntity.Components));
-        Assert.Equal(35, retainedEntity.EstimatedBytes);
+        Assert.Equal(36, retainedEntity.EstimatedBytes);
 
         owner.Position = new Vector3(5, 6, 7);
         input.LastSequence = 9;
@@ -583,7 +583,7 @@ public sealed class SnapshotBuilderTests {
             Assert.Equal(owner.Position, Position(entity));
             Assert.Equal(11u, entity.LastInputSequence);
             Assert.Empty(entity.Components);
-            Assert.Equal(22, entity.EstimatedBytes);
+            Assert.Equal(23, entity.EstimatedBytes);
             Assert.Equal(Serialize(builder.BuildSnapshotForSession(NewSession(owner.Id), nextTick, 60, true)),
                 Serialize(packet));
         }
@@ -594,14 +594,14 @@ public sealed class SnapshotBuilderTests {
         using (var batch = BeginBatch(builder, nextTick)) {
             var entity = Assert.Single(batch.Build(NewSession(owner.Id), 60, true).Entities);
             Assert.Equal(0u, entity.LastInputSequence);
-            Assert.Equal(35, entity.EstimatedBytes);
+            Assert.Equal(36, entity.EstimatedBytes);
             Assert.Same(newVelocity, Assert.Single(entity.Components));
         }
 
         var retainedEntity = Assert.Single(retained.Entities);
         Assert.Equal(new Vector3(1, 2, 3), Position(retainedEntity));
         Assert.Equal(7u, retainedEntity.LastInputSequence);
-        Assert.Equal(35, retainedEntity.EstimatedBytes);
+        Assert.Equal(36, retainedEntity.EstimatedBytes);
         Assert.Same(oldVelocity, Assert.Single(retainedEntity.Components));
         Assert.Equal(6f, oldVelocity.X);
     }

@@ -11,7 +11,7 @@ public sealed class SnapshotBuilder(World.World world) {
     private readonly record struct SnapshotDistanceTierSquared(float MaxDistanceSquared, int TargetHz);
 
     private const float SnapshotGridCellSize = 20f;
-    private const int SnapshotBaseEntityBytes = 22;
+    private const int SnapshotBaseEntityBytes = 23;
     private const int SnapshotVelocityComponentBytes = 13;
     private const int MaxEntitiesPerSnapshot = 220;
     private const int MaxFarthestTierEntitiesPerSnapshot = 32;
@@ -213,6 +213,7 @@ public sealed class SnapshotBuilder(World.World world) {
         snapshot.PositionZ = entity.Position.Z;
         snapshot.EstimatedBytes = SnapshotBaseEntityBytes;
         snapshot.LastInputSequence = 0;
+        snapshot.DefinitionId = entity.DefinitionIndex;
 
         foreach (var component in entity.Components) {
             if (component is INetworkedComponent networked) {
@@ -318,7 +319,6 @@ public sealed class SnapshotBuilder(World.World world) {
     }
 
     private static void RecycleBuffers(Dictionary<long, List<World.Entity>> buffers, Stack<List<World.Entity>> pool) {
-        // Keep only the previous tick's working set, never historical empty cells.
         pool.Clear();
         foreach (var buffer in buffers.Values) {
             buffer.Clear();

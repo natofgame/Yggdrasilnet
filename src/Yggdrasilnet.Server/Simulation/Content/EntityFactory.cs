@@ -5,8 +5,9 @@ using Yggdrasilnet.Server.Simulation.World.Component;
 namespace Yggdrasilnet.Server.Simulation.Content;
 
 public sealed class EntityFactory {
-    public World.Entity Create(ContentEntity.EntityDefinition definition, World.World world, Vector3 position) {
+    public World.Entity Create(ContentEntity.EntityDefinition definition, World.World world, Vector3 position, byte definitionIndex = 0) {
         var entity = world.Spawn(position);
+        entity.DefinitionIndex = definitionIndex;
 
         foreach (var componentDefinition in definition.Components) {
             entity.AddComponent(CreateComponent(componentDefinition, position));
