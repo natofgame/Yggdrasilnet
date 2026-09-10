@@ -62,4 +62,130 @@ public sealed class SteeringSystemTests {
         Assert.Equal(0f, velocity.X);
         Assert.Equal(0f, velocity.Z);
     }
+
+    [Fact]
+    public void RoamConstraintPushesBackInsideWhenOutsideRoamRadius() {
+        var world = new World();
+
+        var crowd = world.Spawn(new Vector3(7f, 0f, 0f));
+        crowd.AddComponent(new VelocityComponent());
+        crowd.AddComponent(new SteeringComponent {
+            MoveSpeed = 2.5f,
+            AvoidRadius = 1f,
+            SeekWeight = 0f,
+            CircleWeight = 0f,
+            WanderWeight = 0f,
+            RoamRadius = 5f,
+            SpawnX = 0f,
+            SpawnZ = 0f
+        });
+
+        new SteeringSystem().Update(world, 1f / 30f);
+
+        Assert.True(crowd.TryGetComponent<VelocityComponent>(out var velocity));
+        Assert.True(velocity.X < -0.001f, "Outside the radius, roam should act like an avoid force and push inward.");
+    }
+
+    [Fact]
+    public void WandersAroundSpawnWithoutPlayers() {
+        var world = new World();
+
+        var crowd = world.Spawn(new Vector3(2f, 0f, 0f));
+        crowd.AddComponent(new VelocityComponent());
+        crowd.AddComponent(new SteeringComponent {
+            MoveSpeed = 2f,
+            AvoidRadius = 1f,
+            SeekWeight = 0f,
+            CircleWeight = 0f,
+            WanderWeight = 1f,
+            WanderJitter = 0f,
+            WanderAngle = 0f,
+            RoamRadius = 5f,
+            SpawnX = 2f,
+            SpawnZ = 0f
+        });
+
+        new SteeringSystem().Update(world, 1f / 30f);
+
+        Assert.True(crowd.TryGetComponent<VelocityComponent>(out var velocity));
+        Assert.True(MathF.Abs(velocity.X) > 0.001f || MathF.Abs(velocity.Z) > 0.001f);
+    }
+
+    [Fact]
+    public void WandersAroundSpawnEvenWhenPlayerIsFarAway() {
+        var world = new World();
+
+        var player = world.Spawn(new Vector3(500f, 0f, 500f));
+        player.AddComponent(new InputComponent { Speed = 3f });
+
+        var crowd = world.Spawn(new Vector3(0f, 0f, 0f));
+        crowd.AddComponent(new VelocityComponent());
+        crowd.AddComponent(new SteeringComponent {
+            MoveSpeed = 2f,
+            AvoidRadius = 1f,
+            SeekWeight = 0f,
+            CircleWeight = 0f,
+            WanderWeight = 1f,
+            WanderJitter = 0f,
+            WanderAngle = 0f,
+            RoamRadius = 5f,
+            SpawnX = 0f,
+            SpawnZ = 0f
+        });
+
+        new SteeringSystem().Update(world, 1f / 30f);
+
+        Assert.True(crowd.TryGetComponent<VelocityComponent>(out var velocity));
+        Assert.True(MathF.Abs(velocity.X) > 0.001f || MathF.Abs(velocity.Z) > 0.001f);
+    }
+
+    [Fact]
+    public void UsesSteeringStrengthToScaleSpeed() {
+        var world = new World();
+
+        var player = world.Spawn(new Vector3(10f, 0f, 0f));
+        player.AddComponent(new InputComponent { Speed = 3f });
+
+        var crowd = world.Spawn(Vector3.Zero);
+        crowd.AddComponent(new VelocityComponent());
+        crowd.AddComponent(new SteeringComponent {
+            MoveSpeed = 2f,
+            AvoidRadius = 1f,
+            SeekWeight = 0.02f,
+            CircleWeight = 0f,
+            WanderWeight = 0f
+        });
+
+        new SteeringSystem().Update(world, 1f / 30f);
+
+        Assert.True(crowd.TryGetComponent<VelocityComponent>(out var velocity));
+        var speed = MathF.Sqrt(velocity.X * velocity.X + velocity.Z * velocity.Z);
+        Assert.InRange(speed, 0.035f, 0.045f);
+    }
+
+    [Fact]
+    public void RoamConstraintAllowsTangentialMovementOutsideRadius() {
+        var world = new World();
+
+        var crowd = world.Spawn(new Vector3(6f, 0f, 0f));
+        crowd.AddComponent(new VelocityComponent());
+        crowd.AddComponent(new SteeringComponent {
+            MoveSpeed = 2f,
+            AvoidRadius = 1f,
+            SeekWeight = 0f,
+            CircleWeight = 0f,
+            WanderWeight = 1f,
+            WanderJitter = 0f,
+            WanderAngle = MathF.PI / 2f,
+            RoamRadius = 5f,
+            SpawnX = 0f,
+            SpawnZ = 0f
+        });
+
+        new SteeringSystem().Update(world, 1f / 30f);
+
+        Assert.True(crowd.TryGetComponent<VelocityComponent>(out var velocity));
+        Assert.InRange(velocity.X, -0.001f, 0.001f);
+        Assert.True(velocity.Z > 0.001f, "Outside the radius, tangential steering should stay allowed.");
+    }
 }

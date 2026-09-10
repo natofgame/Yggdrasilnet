@@ -18,4 +18,8 @@ public sealed class SteeringComponent : IComponent {
     public float WanderJitter { get; set; } = 1f;
 
     public float WanderAngle { get; set; }
+
+    public float RoamRadius { get; set; }
+    public float SpawnX { get; set; }
+    public float SpawnZ { get; set; }
 }
