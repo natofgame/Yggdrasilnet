@@ -7,7 +7,7 @@ using Yggdrasilnet.Shared.Network.Packet.Snapshot;
 namespace Yggdrasilnet.Server.Simulation.Snapshot;
 
 public sealed class SnapshotBuilder(World.World world) {
-    private readonly record struct SnapshotDistanceTier(float MaxDistance, int TargetHz);
+    private readonly record struct SnapshotDistanceTier(float MaxDistance);
     private readonly record struct SnapshotDistanceTierSquared(float MaxDistanceSquared, int TargetHz);
 
     private const float SnapshotGridCellSize = 20f;
@@ -24,9 +24,9 @@ public sealed class SnapshotBuilder(World.World world) {
     private const float VelocityDeltaThresholdSquared = VelocityDeltaThreshold * VelocityDeltaThreshold;
 
     private static readonly SnapshotDistanceTier[] SnapshotDistanceTiers = [
-        new(12f, 20),
-        new(28f, 6),
-        new(45f, 1),
+        new(12f),
+        new(28f),
+        new(45f),
     ];
 
     private static readonly SnapshotDistanceTierSquared[] SnapshotDistanceTiersSquared = [
@@ -48,8 +48,6 @@ public sealed class SnapshotBuilder(World.World world) {
     private int _broadcastBatchVersion;
     private bool _broadcastBatchActive;
 
-    // Borrowed packets are confined to synchronous broadcast, with no world mutations
-    // between builds. The public builder always returns independently owned packets.
     internal BroadcastBatch BeginBroadcastBatch(long tick) {
         if (_broadcastBatchActive) {
             throw new InvalidOperationException("A snapshot broadcast batch is already active.");

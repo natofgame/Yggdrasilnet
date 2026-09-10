@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using LiteNetLib;
 using LiteNetLib.Utils;
+using Yggdrasilnet.Server.Services;
 using Yggdrasilnet.Server.Simulation;
 
 namespace Yggdrasilnet.Server.Tests;
