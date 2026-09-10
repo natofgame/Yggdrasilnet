@@ -29,6 +29,9 @@ public sealed class EntityFactory {
                 CircleWeight = steering.CircleWeight,
                 WanderWeight = steering.WanderWeight,
                 WanderJitter = steering.WanderJitter,
+                RoamRadius = MathF.Max(0f, steering.RoamRadius),
+                SpawnX = position.X,
+                SpawnZ = position.Z,
                 CircleDirection = Random.Shared.NextDouble() < 0.5 ? -1f : 1f,
                 WanderAngle = (float)(Random.Shared.NextDouble() * Math.Tau)
             },

@@ -30,4 +30,6 @@ public sealed class SteeringComponentDefinition : EntityComponentDefinition {
     public float CircleWeight { get; set; } = 1f;
     public float WanderWeight { get; set; }
     public float WanderJitter { get; set; } = 1f;
+    public float RoamRadius { get; set; }
+    public float SpawnSpacing { get; set; }
 }
