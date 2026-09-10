@@ -1,56 +1,67 @@
 using System.Diagnostics;
 using LiteNetLib;
-using LiteNetLib.Utils;
 using Serilog;
 using Yggdrasilnet.Shared.Network.Packet.Packets;
-using Yggdrasilnet.Shared.Network.Packet.Snapshot;
-
-// ReSharper disable once RedundantUsingDirective
-using System.Linq;
 
 namespace Yggdrasilnet.Server;
 
 public sealed class GameLoop(NetServer netServer, Simulation.Simulation simulation, int tickRate) {
     private const long StatsLogIntervalMs = 2000;
     private const int MaxDetailedPlayerLogs = 8;
-    private const int KeyframeIntervalSeconds = 1;
-    private const int SnapshotChunkTargetBytes = 1000;
-    private const int SnapshotChunkHeaderBytes = 10;
-    private const int SnapshotBaseEntityBytes = 22;
-    private const int SnapshotVelocityComponentBytes = 13;
-    private uint _snapshotFrameId;
+    private readonly SnapshotBroadcastService _snapshotBroadcaster = new(netServer, simulation, tickRate);
+    private readonly GameLoopMetrics _metrics = new();
 
     public void Run(CancellationToken cancellationToken) {
-        var deltaTime = 1f / tickRate;
+        var fixedDeltaTime = 1f / tickRate;
+        var minDeltaTime = fixedDeltaTime * 0.5f;
+        var maxDeltaTime = fixedDeltaTime * 3f;
         var tickIntervalMs = 1000L / tickRate;
 
         var stopwatch = Stopwatch.StartNew();
         var nextTickTime = stopwatch.ElapsedMilliseconds;
+        var previousSimulationTimeMs = nextTickTime;
 
         var nextStatsLogTime = stopwatch.ElapsedMilliseconds + StatsLogIntervalMs;
         var ticksSinceLastLog = 0;
-
-        var tickTimeTotalMs = 0.0;
-        var tickTimeMaxMs = 0.0;
-        var systemTimeTotalsMs = new Dictionary<string, double>();
-        var tickStopwatch = new Stopwatch();
 
         while (!cancellationToken.IsCancellationRequested) {
             var now = stopwatch.ElapsedMilliseconds;
 
             if (now >= nextTickTime) {
-                tickStopwatch.Restart();
+                var tickStart = Stopwatch.GetTimestamp();
+
+                var pollStart = Stopwatch.GetTimestamp();
                 netServer.Poll();
-                simulation.Update(deltaTime);
-                BroadcastSnapshot();
-                var tickMs = tickStopwatch.Elapsed.TotalMilliseconds;
+                var pollStop = Stopwatch.GetTimestamp();
+
+                var elapsedMs = Math.Max(0L, now - previousSimulationTimeMs);
+                var measuredDeltaTime = elapsedMs / 1000f;
+                var simulationDeltaTime = Math.Clamp(measuredDeltaTime, minDeltaTime, maxDeltaTime);
+                previousSimulationTimeMs = now;
+
+                var simulationStart = Stopwatch.GetTimestamp();
+                simulation.Update(simulationDeltaTime);
+                var simulationStop = Stopwatch.GetTimestamp();
+
+                var snapshotStart = Stopwatch.GetTimestamp();
+                var snapshotMetrics = _snapshotBroadcaster.Broadcast();
+                var snapshotStop = Stopwatch.GetTimestamp();
+
+                var tickStop = Stopwatch.GetTimestamp();
+                var tickMs = Stopwatch.GetElapsedTime(tickStart, tickStop).TotalMilliseconds;
+                var pollMs = Stopwatch.GetElapsedTime(pollStart, pollStop).TotalMilliseconds;
+                var simulationMs = Stopwatch.GetElapsedTime(simulationStart, simulationStop).TotalMilliseconds;
+                var snapshotMs = Stopwatch.GetElapsedTime(snapshotStart, snapshotStop).TotalMilliseconds;
 
                 ticksSinceLastLog++;
-                tickTimeTotalMs += tickMs;
-                tickTimeMaxMs = Math.Max(tickTimeMaxMs, tickMs);
-                foreach (var (systemName, systemMs) in simulation.World.LastSystemTimingsMs) {
-                    systemTimeTotalsMs[systemName] = systemTimeTotalsMs.GetValueOrDefault(systemName) + systemMs;
-                }
+                _metrics.RecordTick(
+                    tickMs,
+                    pollMs,
+                    simulationMs,
+                    snapshotMs,
+                    simulation.World.LastSystemTimingsMs,
+                    snapshotMetrics
+                );
 
                 nextTickTime += tickIntervalMs;
                 if (stopwatch.ElapsedMilliseconds > nextTickTime + tickIntervalMs) {
@@ -66,32 +77,55 @@ public sealed class GameLoop(NetServer netServer, Simulation.Simulation simulati
             now = stopwatch.ElapsedMilliseconds;
             if (now >= nextStatsLogTime) {
                 var elapsedSeconds = (now - (nextStatsLogTime - StatsLogIntervalMs)) / 1000f;
-                LogStats(ticksSinceLastLog, elapsedSeconds, tickTimeTotalMs, tickTimeMaxMs, systemTimeTotalsMs);
+                LogStats(ticksSinceLastLog, elapsedSeconds);
                 ticksSinceLastLog = 0;
-                tickTimeTotalMs = 0.0;
-                tickTimeMaxMs = 0.0;
-                systemTimeTotalsMs.Clear();
                 nextStatsLogTime = now + StatsLogIntervalMs;
             }
         }
     }
 
-    private void LogStats(int ticksSinceLastLog, float elapsedSeconds, double tickTimeTotalMs, double tickTimeMaxMs,
-        Dictionary<string, double> systemTimeTotalsMs) {
+    private void LogStats(int ticksSinceLastLog, float elapsedSeconds) {
         var actualTps = elapsedSeconds > 0 ? ticksSinceLastLog / elapsedSeconds : 0f;
         var sessions = simulation.Sessions.All;
-        var avgTickMs = ticksSinceLastLog > 0 ? tickTimeTotalMs / ticksSinceLastLog : 0.0;
         var budgetMs = 1000.0 / tickRate;
+        var netMetrics = netServer.CollectAndResetMetrics();
+        var metrics = _metrics.BuildReportAndReset(ticksSinceLastLog, netMetrics);
 
         Log.Information(
             "Server status: {ActualTps:F1}/{TargetTps} tps, {EntityCount} entities, {PlayerCount} player(s), tick avg {AvgTickMs:F2}ms / max {MaxTickMs:F2}ms (budget {BudgetMs:F2}ms)",
-            actualTps, tickRate, simulation.World.Entities.Count, sessions.Count, avgTickMs, tickTimeMaxMs, budgetMs);
+            actualTps, tickRate, simulation.World.Entities.Count, sessions.Count, metrics.AvgTickMs, metrics.MaxTickMs, budgetMs);
 
         if (ticksSinceLastLog > 0) {
-            foreach (var (systemName, totalMs) in systemTimeTotalsMs.OrderByDescending(kv => kv.Value)) {
+            foreach (var (systemName, totalMs) in metrics.SystemTimeTotalsMs.OrderByDescending(kv => kv.Value)) {
                 Log.Information("  {SystemName}: avg {AvgMs:F3}ms/tick", systemName, totalMs / ticksSinceLastLog);
             }
         }
+
+        Log.Information(
+            "  Outside ECS: poll {PollMs:F3}ms/tick, simulation total {SimulationMs:F3}ms/tick, snapshot broadcast {SnapshotMs:F3}ms/tick",
+            metrics.AvgPollMs, metrics.AvgSimulationMs, metrics.AvgSnapshotBroadcastMs
+        );
+        Log.Information(
+            "  Snapshot: avg entities {AvgEntities:F1}/tick, avg chunks {AvgChunks:F1}/tick",
+            metrics.AvgSnapshotEntities, metrics.AvgSnapshotChunks
+        );
+        Log.Information(
+            "  Network I/O: send {SendCalls} calls, {SendBytes} bytes, serialize {SerializeMs:F2}ms, socket {SocketMs:F2}ms | recv {ReceiveCalls} packets, {ReceiveBytes} bytes, decode {DecodeMs:F2}ms",
+            metrics.NetIo.SendCalls,
+            metrics.NetIo.SendBytes,
+            metrics.NetIo.SendSerializeMs,
+            metrics.NetIo.SendSocketMs,
+            metrics.NetIo.ReceiveCalls,
+            metrics.NetIo.ReceiveBytes,
+            metrics.NetIo.ReceiveDecodeMs
+        );
+        Log.Information(
+            "  GC: gen0 {Gc0}, gen1 {Gc1}, gen2 {Gc2}, allocated {AllocatedMB:F2} MB",
+            metrics.Gc0Collections,
+            metrics.Gc1Collections,
+            metrics.Gc2Collections,
+            metrics.AllocatedBytes / (1024d * 1024d)
+        );
 
         if (sessions.Count <= MaxDetailedPlayerLogs) {
             foreach (var session in sessions) {
@@ -105,7 +139,7 @@ public sealed class GameLoop(NetServer netServer, Simulation.Simulation simulati
                 sessions.Count, avgPing, maxPing);
         }
 
-        BroadcastStats(actualTps, sessions.Count, (float)avgTickMs, (float)tickTimeMaxMs, (float)budgetMs);
+        BroadcastStats(actualTps, sessions.Count, (float)metrics.AvgTickMs, (float)metrics.MaxTickMs, (float)budgetMs);
     }
 
     private void BroadcastStats(float actualTps, int playerCount, float avgTickMs, float maxTickMs, float budgetMs) {
@@ -128,69 +162,4 @@ public sealed class GameLoop(NetServer netServer, Simulation.Simulation simulati
         }
     }
 
-    private void BroadcastSnapshot() {
-        var sessions = simulation.Sessions.All;
-        if (sessions.Count == 0) {
-            return;
-        }
-
-        var frameId = unchecked(++_snapshotFrameId);
-        var keyframeIntervalTicks = Math.Max(1, tickRate * KeyframeIntervalSeconds);
-        var isKeyframeTick = simulation.Tick % keyframeIntervalTicks == 0;
-        foreach (var session in sessions) {
-            var snapshot = simulation.BuildSnapshotForSession(session, tickRate, isKeyframeTick);
-            if (snapshot.Entities.Count == 0) {
-                continue;
-            }
-
-            foreach (var chunk in CreateSnapshotChunks(snapshot.Entities, frameId)) {
-                var delivery = isKeyframeTick ? DeliveryMethod.ReliableOrdered : DeliveryMethod.Sequenced;
-                netServer.Send(session.Peer, chunk, delivery);
-            }
-        }
-    }
-
-    private static IEnumerable<SnapshotChunkPacket> CreateSnapshotChunks(List<EntitySnapshot> entities, uint frameId) {
-        if (entities.Count == 0) {
-            yield break;
-        }
-
-        var currentChunk = new SnapshotChunkPacket {
-            FrameId = frameId,
-            ChunkIndex = 0,
-        };
-        var currentBytes = SnapshotChunkHeaderBytes;
-
-        foreach (var entity in entities) {
-            var entityBytes = EstimateEntityBytes(entity);
-            var wouldOverflow = currentChunk.Entities.Count > 0
-                                && currentBytes + entityBytes > SnapshotChunkTargetBytes;
-            if (wouldOverflow) {
-                yield return currentChunk;
-                currentChunk = new SnapshotChunkPacket {
-                    FrameId = frameId,
-                    ChunkIndex = (ushort)(currentChunk.ChunkIndex + 1),
-                };
-                currentBytes = SnapshotChunkHeaderBytes;
-            }
-
-            currentChunk.Entities.Add(entity);
-            currentBytes += entityBytes;
-        }
-
-        currentChunk.IsLastChunk = true;
-        yield return currentChunk;
-    }
-
-    private static int EstimateEntityBytes(EntitySnapshot entity) {
-        var size = SnapshotBaseEntityBytes;
-        foreach (var component in entity.Components) {
-            size += component.Type switch {
-                NetworkedComponentType.Velocity => SnapshotVelocityComponentBytes,
-                _ => 0
-            };
-        }
-
-        return size;
-    }
 }
