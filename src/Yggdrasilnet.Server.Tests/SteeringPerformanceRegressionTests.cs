@@ -4,6 +4,7 @@ using System.Reflection;
 using Yggdrasilnet.Server.Simulation.World;
 using Yggdrasilnet.Server.Simulation.World.Component;
 using Yggdrasilnet.Server.Simulation.World.System;
+using Yggdrasilnet.Server.Simulation.World.System.Steering;
 
 namespace Yggdrasilnet.Server.Tests;
 
@@ -467,8 +468,17 @@ public sealed class SteeringPerformanceRegressionTests {
 
     private static object Field(object instance, string name) {
         var field = instance.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.NotNull(field);
-        return field.GetValue(instance)!;
+        if (field != null) {
+            return field.GetValue(instance)!;
+        }
+
+        // Steering grids/lists now live on SteeringSystem's shared SteeringContext.
+        var contextField = instance.GetType().GetField("_context", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(contextField);
+        var context = contextField.GetValue(instance)!;
+        var nestedField = context.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(nestedField);
+        return nestedField.GetValue(context)!;
     }
 
     private static IDictionary Grid(SteeringSystem system, string name) =>

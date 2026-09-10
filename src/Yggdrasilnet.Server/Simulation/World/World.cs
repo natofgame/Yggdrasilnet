@@ -3,6 +3,7 @@ using System.Numerics;
 using Yggdrasilnet.Server.Simulation.World.Component;
 using Yggdrasilnet.Server.Simulation.World.Managers;
 using Yggdrasilnet.Server.Simulation.World.System;
+using Yggdrasilnet.Server.Simulation.World.System.Steering;
 
 namespace Yggdrasilnet.Server.Simulation.World;
 
