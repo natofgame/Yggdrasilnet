@@ -1,3 +1,6 @@
+using Yggdrasilnet.Server.Services;
+using Yggdrasilnet.Server.Services.Debug.Metric;
+
 namespace Yggdrasilnet.Server.Tests;
 
 public sealed class GameLoopMetricsTests {

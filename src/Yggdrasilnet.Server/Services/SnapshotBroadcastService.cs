@@ -1,9 +1,8 @@
 using LiteNetLib;
-using Yggdrasilnet.Server.Simulation;
 using Yggdrasilnet.Shared.Network.Packet.Packets;
 using Yggdrasilnet.Shared.Network.Packet.Snapshot;
 
-namespace Yggdrasilnet.Server;
+namespace Yggdrasilnet.Server.Services;
 
 public sealed class SnapshotBroadcastService(NetServer netServer, Simulation.Simulation simulation, int tickRate) {
     private const int KeyframeIntervalSeconds = 1;
@@ -86,7 +85,6 @@ public sealed class SnapshotBroadcastService(NetServer netServer, Simulation.Sim
                 SendChunk(peer, currentChunk, delivery, ref metrics);
             }
         } finally {
-            // NetServer.Send serializes and hands off bytes before returning.
             currentChunk.Entities.Clear();
         }
     }
