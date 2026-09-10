@@ -8,6 +8,7 @@ public sealed class Entity {
     public Vector3 Position { get; set; }
 
     private readonly Dictionary<Type, IComponent> _components = new();
+    internal Action<Type>? ComponentStructureChanged { get; set; }
     
     public IEnumerable<IComponent> Components => _components.Values;
 
@@ -17,11 +18,21 @@ public sealed class Entity {
     }
 
     public void AddComponent(IComponent component) {
-        _components[component.GetType()] = component;
+        var type = component.GetType();
+        if (_components.TryAdd(type, component)) {
+            ComponentStructureChanged?.Invoke(type);
+        } else {
+            _components[type] = component;
+        }
     }
 
     public bool RemoveComponent<T>() where T : IComponent {
-        return _components.Remove(typeof(T));
+        if (!_components.Remove(typeof(T))) {
+            return false;
+        }
+
+        ComponentStructureChanged?.Invoke(typeof(T));
+        return true;
     }
 
     public bool HasComponent<T>() where T : IComponent {

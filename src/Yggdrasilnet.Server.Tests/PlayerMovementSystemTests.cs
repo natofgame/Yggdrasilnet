@@ -1,3 +1,4 @@
+using System.Numerics;
 using Yggdrasilnet.Server.Simulation.World;
 using Yggdrasilnet.Server.Simulation.World.Component;
 using Yggdrasilnet.Server.Simulation.World.System;
@@ -33,5 +34,29 @@ public sealed class PlayerMovementSystemTests {
         Assert.True(entity.TryGetComponent<VelocityComponent>(out var velocity));
         Assert.Equal(0f, velocity.X);
         Assert.Equal(0f, velocity.Z);
+    }
+
+    [Fact]
+    public void MovementDoesNotSnapSteeredEntityBackToSpawnRadius() {
+        var world = new World();
+        var entity = world.Spawn(new Vector3(7f, 0f, 0f));
+        entity.AddComponent(new VelocityComponent { X = 10f, Z = 0f });
+        entity.AddComponent(new SteeringComponent { RoamRadius = 5f, SpawnX = 0f, SpawnZ = 0f });
+
+        new MovementSystem().Update(world, 1f);
+
+        Assert.Equal(17f, entity.Position.X, 3);
+    }
+
+    [Fact]
+    public void MovementDoesNotClampWhenRoamRadiusIsDisabled() {
+        var world = new World();
+        var entity = world.Spawn(new Vector3(7f, 0f, 0f));
+        entity.AddComponent(new VelocityComponent { X = 1f, Z = 0f });
+        entity.AddComponent(new SteeringComponent { RoamRadius = 0f, SpawnX = 0f, SpawnZ = 0f });
+
+        new MovementSystem().Update(world, 1f);
+
+        Assert.Equal(8f, entity.Position.X, 3);
     }
 }

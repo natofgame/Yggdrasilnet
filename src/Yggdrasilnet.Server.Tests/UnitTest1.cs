@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using LiteNetLib;
 using LiteNetLib.Utils;
+using Yggdrasilnet.Server.Services;
 using Yggdrasilnet.Server.Simulation;
 
 namespace Yggdrasilnet.Server.Tests;
@@ -10,12 +11,11 @@ namespace Yggdrasilnet.Server.Tests;
 public sealed class NetServerConnectionTests {
     [Fact]
     public void ClientConnectsWithValidConnectionKey() {
-        var port = GetFreePort();
         var server = new NetServer(new ConcurrentQueue<ISimulationEvent>());
+        var port = StartServerWithAvailablePort(server);
         var listener = new TestClientListener();
         var client = new NetManager(listener) { AutoRecycle = true };
 
-        server.Start(port);
         client.Start();
         client.Connect("127.0.0.1", port, "Yggdrasilnet");
 
@@ -31,12 +31,11 @@ public sealed class NetServerConnectionTests {
 
     [Fact]
     public void ClientIsRejectedWithInvalidConnectionKey() {
-        var port = GetFreePort();
         var server = new NetServer(new ConcurrentQueue<ISimulationEvent>());
+        var port = StartServerWithAvailablePort(server);
         var listener = new TestClientListener();
         var client = new NetManager(listener) { AutoRecycle = true };
 
-        server.Start(port);
         client.Start();
         client.Connect("127.0.0.1", port, "InvalidKey");
 
@@ -67,12 +66,27 @@ public sealed class NetServerConnectionTests {
         throw new TimeoutException("Timed out while waiting for network condition.");
     }
 
-    private static int GetFreePort() {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var endPoint = (IPEndPoint)listener.LocalEndpoint;
-        listener.Stop();
-        return endPoint.Port;
+    private static int StartServerWithAvailablePort(NetServer server) {
+        const int attempts = 20;
+
+        for (var i = 0; i < attempts; i++) {
+            var port = GetFreeUdpPort();
+            try {
+                server.Start(port);
+                return port;
+            }
+            catch (InvalidOperationException) {
+                // Some ephemeral ports can be denied by OS policies on Windows.
+            }
+        }
+
+        throw new InvalidOperationException("Unable to bind a UDP port for NetServer tests after multiple attempts.");
+    }
+
+    private static int GetFreeUdpPort() {
+        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+        socket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        return ((IPEndPoint)socket.LocalEndPoint!).Port;
     }
 
     private sealed class TestClientListener : INetEventListener {

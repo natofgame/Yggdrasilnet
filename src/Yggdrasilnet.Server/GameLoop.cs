@@ -1,23 +1,61 @@
 using System.Diagnostics;
-using LiteNetLib;
+using Yggdrasilnet.Server.Services;
+using Yggdrasilnet.Server.Utils;
 
 namespace Yggdrasilnet.Server;
 
 public sealed class GameLoop(NetServer netServer, Simulation.Simulation simulation, int tickRate) {
+    private readonly SnapshotBroadcastService _snapshotBroadcaster = new(netServer, simulation, tickRate);
+
+    public event Action<TickMetrics>? Ticked;
+
     public void Run(CancellationToken cancellationToken) {
-        var deltaTime = 1f / tickRate;
+        var fixedDeltaTime = 1f / tickRate;
+        var minDeltaTime = fixedDeltaTime * 0.5f;
+        var maxDeltaTime = fixedDeltaTime * 3f;
         var tickIntervalMs = 1000L / tickRate;
 
         var stopwatch = Stopwatch.StartNew();
         var nextTickTime = stopwatch.ElapsedMilliseconds;
+        var previousSimulationTimeMs = nextTickTime;
 
         while (!cancellationToken.IsCancellationRequested) {
             var now = stopwatch.ElapsedMilliseconds;
 
             if (now >= nextTickTime) {
+                var tickStart = Stopwatch.GetTimestamp();
+
+                var pollStart = Stopwatch.GetTimestamp();
                 netServer.Poll();
-                simulation.Update(deltaTime);
-                BroadcastSnapshot();
+                var pollStop = Stopwatch.GetTimestamp();
+
+                var elapsedMs = Math.Max(0L, now - previousSimulationTimeMs);
+                var measuredDeltaTime = elapsedMs / 1000f;
+                var simulationDeltaTime = Math.Clamp(measuredDeltaTime, minDeltaTime, maxDeltaTime);
+                previousSimulationTimeMs = now;
+
+                var simulationStart = Stopwatch.GetTimestamp();
+                simulation.Update(simulationDeltaTime);
+                var simulationStop = Stopwatch.GetTimestamp();
+
+                var snapshotStart = Stopwatch.GetTimestamp();
+                var snapshotMetrics = _snapshotBroadcaster.Broadcast();
+                var snapshotStop = Stopwatch.GetTimestamp();
+
+                var tickStop = Stopwatch.GetTimestamp();
+                var tickMs = Stopwatch.GetElapsedTime(tickStart, tickStop).TotalMilliseconds;
+                var pollMs = Stopwatch.GetElapsedTime(pollStart, pollStop).TotalMilliseconds;
+                var simulationMs = Stopwatch.GetElapsedTime(simulationStart, simulationStop).TotalMilliseconds;
+                var snapshotMs = Stopwatch.GetElapsedTime(snapshotStart, snapshotStop).TotalMilliseconds;
+
+                Ticked?.Invoke(new TickMetrics(
+                    tickMs,
+                    pollMs,
+                    simulationMs,
+                    snapshotMs,
+                    simulation.World.LastSystemTimingsMs,
+                    snapshotMetrics
+                ));
 
                 nextTickTime += tickIntervalMs;
                 if (stopwatch.ElapsedMilliseconds > nextTickTime + tickIntervalMs) {
@@ -29,18 +67,6 @@ public sealed class GameLoop(NetServer netServer, Simulation.Simulation simulati
                     Thread.Sleep(1);
                 }
             }
-        }
-    }
-
-    private void BroadcastSnapshot() {
-        var sessions = simulation.Sessions.All;
-        if (sessions.Count == 0) {
-            return;
-        }
-
-        var snapshot = simulation.BuildSnapshot();
-        foreach (var session in sessions) {
-            netServer.Send(session.Peer, snapshot, DeliveryMethod.Sequenced);
         }
     }
 }

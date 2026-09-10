@@ -1,7 +1,7 @@
 {
   "id": "goblin",
   "components": [
-    { "type": "velocity", "speed": 2.5 },
+    { "type": "velocity", "speed": 0 },
     { "type": "health", "max": 30 }
   ]
 }

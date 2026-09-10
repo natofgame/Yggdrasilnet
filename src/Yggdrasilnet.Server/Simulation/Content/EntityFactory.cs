@@ -9,17 +9,32 @@ public sealed class EntityFactory {
         var entity = world.Spawn(position);
 
         foreach (var componentDefinition in definition.Components) {
-            entity.AddComponent(CreateComponent(componentDefinition));
+            entity.AddComponent(CreateComponent(componentDefinition, position));
         }
 
         return entity;
     }
 
-    private static IComponent CreateComponent(ContentEntity.EntityComponentDefinition definition) {
+    private static IComponent CreateComponent(ContentEntity.EntityComponentDefinition definition, Vector3 position) {
         return definition switch {
             ContentEntity.VelocityComponentDefinition velocity => new VelocityComponent { X = velocity.Speed },
             ContentEntity.HealthComponentDefinition health => new HealthComponent { Max = health.Max, Current = health.Max },
             ContentEntity.InputComponentDefinition input => new InputComponent { Speed =  input.Speed },
+            ContentEntity.SteeringComponentDefinition steering => new SteeringComponent {
+                MoveSpeed = steering.Speed,
+                AvoidRadius = steering.AvoidRadius,
+                AvoidWeight = steering.AvoidWeight,
+                SeekWeight = steering.SeekWeight,
+                CircleRadius = steering.CircleRadius,
+                CircleWeight = steering.CircleWeight,
+                WanderWeight = steering.WanderWeight,
+                WanderJitter = steering.WanderJitter,
+                RoamRadius = MathF.Max(0f, steering.RoamRadius),
+                SpawnX = position.X,
+                SpawnZ = position.Z,
+                CircleDirection = Random.Shared.NextDouble() < 0.5 ? -1f : 1f,
+                WanderAngle = (float)(Random.Shared.NextDouble() * Math.Tau)
+            },
             _ => throw new NotSupportedException($"Unknown component definition {definition.GetType()}")
         };
     }

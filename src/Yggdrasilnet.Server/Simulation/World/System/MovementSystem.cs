@@ -1,4 +1,4 @@
-﻿using System.Numerics;
+using System.Numerics;
 using Yggdrasilnet.Server.Simulation.World.Component;
 
 namespace Yggdrasilnet.Server.Simulation.World.System;

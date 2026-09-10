@@ -8,7 +8,8 @@ public sealed class EntitySnapshot {
     public float PositionY { get; set; }
     public float PositionZ { get; set; }
     public List<INetworkedComponent> Components { get; set; } = new();
-    
+    public int EstimatedBytes { get; set; }
+
     public uint LastInputSequence { get; set; }
 
     public void WriteTo(NetDataWriter writer) {

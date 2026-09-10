@@ -1,5 +1,7 @@
 using Serilog;
 using Yggdrasilnet.Server;
+using Yggdrasilnet.Server.Services;
+using Yggdrasilnet.Server.Services.Debug;
 using Yggdrasilnet.Server.Simulation;
 
 Log.Logger = new LoggerConfiguration()
@@ -16,6 +18,9 @@ netServer.Start(port);
 
 var gameLoop = new GameLoop(netServer, simulation, tickRate);
 simulation.NetServer = netServer;
+
+var statsReporter = new DebugService(netServer, simulation, tickRate);
+statsReporter.Attach(gameLoop);
 
 using var cts = new CancellationTokenSource();
 Console.CancelKeyPress += (_, args) => {
