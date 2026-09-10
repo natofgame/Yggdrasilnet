@@ -5,11 +5,12 @@
     {
       "type": "steering",
       "speed": 2.0,
-      "avoidRadius": 1.0,
-      "avoidWeight": 1.2,
+      "avoidRadius": 0,
+      "avoidWeight": 0,
       "seekWeight": 0,
       "circleRadius": 0,
       "circleWeight": 0,
+      "spawnSpacing": 4.0,
       "wanderWeight": 0.6,
       "wanderJitter": 1.5
     }
