@@ -1,35 +1,29 @@
 using System.Collections.Concurrent;
-using System.Linq;
 using System.Numerics;
 using LiteNetLib;
 using Serilog;
 using Yggdrasilnet.Server.Handlers;
 using Yggdrasilnet.Server.Simulation.Content;
+using Yggdrasilnet.Server.Simulation.Snapshot;
 using ContentEntity = Yggdrasilnet.Server.Simulation.Content.Entity;
 using Yggdrasilnet.Server.Simulation.Session;
-using Yggdrasilnet.Server.Simulation.World.Component;
 using Yggdrasilnet.Server.Utils;
 using Yggdrasilnet.Shared.Network;
 using Yggdrasilnet.Shared.Network.Packet;
 using Yggdrasilnet.Shared.Network.Packet.Packets;
-using Yggdrasilnet.Shared.Network.Packet.Snapshot;
 
 namespace Yggdrasilnet.Server.Simulation;
 
 public sealed class Simulation : ISimulationContext {
-    private readonly record struct SnapshotDistanceTier(float MaxDistance, int TargetHz);
-    private readonly record struct SnapshotDistanceTierSquared(float MaxDistanceSquared, int TargetHz);
-
     public ConcurrentQueue<ISimulationEvent> IncomingEvents { get; } = new();
 
     private readonly PacketDispatcher<ISimulationContext> _dispatcher = new();
     private readonly PlayerSessionRegistry _sessions = new();
     private readonly World.World _world;
+    private readonly SnapshotBuilder _snapshotBuilder;
 
     private readonly DefinitionRegistry<ContentEntity.EntityDefinition> _entityDefinitions = new();
     private readonly EntityFactory _entityFactory = new();
-    private readonly Dictionary<(int X, int Y), List<World.Entity>> _interestGrid = new();
-    private long _interestGridBuiltAtTick = -1;
 
     public NetServer? NetServer { get; set; }
     
@@ -44,6 +38,7 @@ public sealed class Simulation : ISimulationContext {
         
         _world = new World.World();
         _world.Load();
+        _snapshotBuilder = new SnapshotBuilder(_world);
 
         _entityDefinitions.Load(ContentPaths.Resolve("Entities"));
 
@@ -53,21 +48,8 @@ public sealed class Simulation : ISimulationContext {
     private const string CrowdSizeEnvVar = "YGG_CROWD_SIZE";
     private const int DefaultCrowdSize = 0;
     private const float CrowdAreaSize = 30f;
+    private const float DefaultCrowdSpawnSpacing = 4f;
     private const int MaxEntitiesPerSpawnRequest = 20_000;
-    private const float SnapshotGridCellSize = 20f;
-    private const int MaxStationaryEntityHz = 2;
-    private const float StationarySpeedSquaredEpsilon = 0.0001f;
-    private const float PositionDeltaThreshold = 0.10f;
-    private const float VelocityDeltaThreshold = 0.05f;
-
-    private static readonly SnapshotDistanceTier[] SnapshotDistanceTiers = [
-        new(15f, 20),
-        new(35f, 8),
-        new(60f, 2),
-    ];
-
-    private static readonly SnapshotDistanceTierSquared[] SnapshotDistanceTiersSquared =
-        SnapshotDistanceTiers.Select(tier => new SnapshotDistanceTierSquared(tier.MaxDistance * tier.MaxDistance, tier.TargetHz)).ToArray();
     
     public void SpawnEntities(string definitionId, int count) {
         count = Math.Clamp(count, 0, MaxEntitiesPerSpawnRequest);
@@ -80,13 +62,10 @@ public sealed class Simulation : ISimulationContext {
             return;
         }
 
-        var half = CrowdAreaSize / 2f;
         var random = new Random();
-        for (var i = 0; i < count; i++) {
-            var position = new Vector3(
-                (float)(random.NextDouble() * 2f - 1f) * half,
-                0f,
-                (float)(random.NextDouble() * 2f - 1f) * half);
+        var spawnPositions = BuildSpawnPositions(definitionId, definition, count, random);
+        for (var i = 0; i < spawnPositions.Count; i++) {
+            var position = spawnPositions[i];
             _entityFactory.Create(definition, World, position);
         }
 
@@ -97,6 +76,61 @@ public sealed class Simulation : ISimulationContext {
     private static int ReadCrowdSizeFromEnv() {
         var raw = Environment.GetEnvironmentVariable(CrowdSizeEnvVar);
         return int.TryParse(raw, out var count) ? count : DefaultCrowdSize;
+    }
+
+    private static List<Vector3> BuildSpawnPositions(string definitionId, ContentEntity.EntityDefinition definition, int count, Random random) {
+        if (count <= 0) {
+            return [];
+        }
+
+        if (!string.Equals(definitionId, "crowd", StringComparison.OrdinalIgnoreCase)) {
+            return BuildRandomSquarePositions(count, CrowdAreaSize, random);
+        }
+
+        var spacing = ResolveCrowdSpawnSpacing(definition);
+        return BuildSpacedGridPositions(count, spacing);
+    }
+
+    private static float ResolveCrowdSpawnSpacing(ContentEntity.EntityDefinition definition) {
+        foreach (var component in definition.Components) {
+            if (component is ContentEntity.SteeringComponentDefinition steering && steering.SpawnSpacing > 0f) {
+                return steering.SpawnSpacing;
+            }
+        }
+
+        return DefaultCrowdSpawnSpacing;
+    }
+
+    private static List<Vector3> BuildRandomSquarePositions(int count, float areaSize, Random random) {
+        var positions = new List<Vector3>(count);
+        var half = areaSize / 2f;
+        for (var i = 0; i < count; i++) {
+            positions.Add(new Vector3(
+                (float)(random.NextDouble() * 2f - 1f) * half,
+                0f,
+                (float)(random.NextDouble() * 2f - 1f) * half
+            ));
+        }
+
+        return positions;
+    }
+
+    private static List<Vector3> BuildSpacedGridPositions(int count, float spacing) {
+        var safeSpacing = MathF.Max(0.5f, spacing);
+        var side = (int)MathF.Ceiling(MathF.Sqrt(count));
+        var half = ((side - 1) * safeSpacing) / 2f;
+        var positions = new List<Vector3>(count);
+        for (var index = 0; index < count; index++) {
+            var x = index % side;
+            var z = index / side;
+            positions.Add(new Vector3(
+                x * safeSpacing - half,
+                0f,
+                z * safeSpacing - half
+            ));
+        }
+
+        return positions;
     }
 
     public void Update(float deltaTime) {
@@ -158,178 +192,8 @@ public sealed class Simulation : ISimulationContext {
     }
 
     public SnapshotPacket BuildSnapshotForSession(PlayerSession session, int tickRate, bool forceFullSnapshot) {
-        var packet = new SnapshotPacket();
-        if (session.EntityId == -1) {
-            return packet;
-        }
-
-        if (!World.TryGetEntity(session.EntityId, out var ownerEntity)) {
-            return packet;
-        }
-
-        var observerPosition = Flat(ownerEntity.Position);
-        packet.Entities.Add(BuildEntitySnapshot(ownerEntity));
-        var sentStates = session.LastSentEntities;
-        UpsertSentState(sentStates, ownerEntity, Tick, forceFullSnapshot);
-
-        EnsureInterestGrid();
-        var maxDistance = SnapshotDistanceTiers[^1].MaxDistance;
-        foreach (var entity in EnumerateNearbyEntities(observerPosition, maxDistance)) {
-            if (entity.Id == ownerEntity.Id) {
-                continue;
-            }
-
-            var distanceSquared = Vector2.DistanceSquared(observerPosition, Flat(entity.Position));
-            var targetHz = ResolveTargetHz(distanceSquared);
-            if (targetHz <= 0) {
-                sentStates.Remove(entity.Id);
-                continue;
-            }
-
-            if (IsStationary(entity)) {
-                targetHz = Math.Min(targetHz, MaxStationaryEntityHz);
-            }
-
-            sentStates.TryGetValue(entity.Id, out var state);
-            if (!forceFullSnapshot && !IsEntityDueForSend(state, targetHz, tickRate, Tick)) {
-                continue;
-            }
-
-            if (!forceFullSnapshot && state != null && !HasSignificantChange(entity, state)) {
-                continue;
-            }
-
-            packet.Entities.Add(BuildEntitySnapshot(entity));
-            UpsertSentState(sentStates, entity, Tick, forceFullSnapshot);
-        }
-
-        return packet;
+        return _snapshotBuilder.BuildSnapshotForSession(session, Tick, tickRate, forceFullSnapshot);
     }
 
-    private static EntitySnapshot BuildEntitySnapshot(World.Entity entity) {
-        var snapshot = new EntitySnapshot {
-            EntityId = entity.Id,
-            PositionX = entity.Position.X,
-            PositionY = entity.Position.Y,
-            PositionZ = entity.Position.Z
-        };
-
-        foreach (var component in entity.Components) {
-            if (component is INetworkedComponent networked) {
-                snapshot.Components.Add(networked);
-            }
-        }
-
-        if (entity.TryGetComponent<InputComponent>(out var input)) {
-            snapshot.LastInputSequence = input.LastSequence;
-        }
-
-        return snapshot;
-    }
-
-    private int ResolveTargetHz(float distanceSquared) {
-        foreach (var tier in SnapshotDistanceTiersSquared) {
-            if (distanceSquared <= tier.MaxDistanceSquared) {
-                return tier.TargetHz;
-            }
-        }
-
-        return 0;
-    }
-
-    private static bool IsEntityDueForSend(SentEntityState? state, int targetHz, int tickRate, long currentTick) {
-        if (state == null) {
-            return true;
-        }
-
-        var safeTickRate = Math.Max(1, tickRate);
-        var safeHz = Math.Max(1, targetHz);
-        var intervalTicks = Math.Max(1, (int)MathF.Round(safeTickRate / (float)safeHz));
-        return currentTick - state.LastSentTick >= intervalTicks;
-    }
-
-    private static bool IsStationary(World.Entity entity) {
-        if (!entity.TryGetComponent<VelocityComponent>(out var velocity)) {
-            return false;
-        }
-
-        var speedSquared = velocity.X * velocity.X + velocity.Y * velocity.Y + velocity.Z * velocity.Z;
-        return speedSquared <= StationarySpeedSquaredEpsilon;
-    }
-
-    private static bool HasSignificantChange(World.Entity entity, SentEntityState state) {
-        var positionDeltaSquared = Vector3.DistanceSquared(entity.Position, state.Position);
-        if (positionDeltaSquared >= PositionDeltaThreshold * PositionDeltaThreshold) {
-            return true;
-        }
-
-        var velocity = ReadVelocity(entity);
-        var velocityDeltaSquared = Vector3.DistanceSquared(velocity, state.Velocity);
-        return velocityDeltaSquared >= VelocityDeltaThreshold * VelocityDeltaThreshold;
-    }
-
-    private static void UpsertSentState(Dictionary<int, SentEntityState> sentStates, World.Entity entity, long tick, bool fullSnapshot) {
-        if (!sentStates.TryGetValue(entity.Id, out var state)) {
-            state = new SentEntityState();
-            sentStates[entity.Id] = state;
-        }
-
-        state.Position = entity.Position;
-        state.Velocity = ReadVelocity(entity);
-        state.LastSentTick = tick;
-        if (fullSnapshot) {
-            state.LastFullSentTick = tick;
-        }
-    }
-
-    private static Vector3 ReadVelocity(World.Entity entity) {
-        if (!entity.TryGetComponent<VelocityComponent>(out var velocity)) {
-            return Vector3.Zero;
-        }
-
-        return new Vector3(velocity.X, velocity.Y, velocity.Z);
-    }
-
-    private void EnsureInterestGrid() {
-        if (_interestGridBuiltAtTick == Tick) {
-            return;
-        }
-
-        _interestGrid.Clear();
-        foreach (var entity in World.Entities) {
-            var key = GetGridCell(Flat(entity.Position));
-            if (!_interestGrid.TryGetValue(key, out var entities)) {
-                entities = [];
-                _interestGrid[key] = entities;
-            }
-
-            entities.Add(entity);
-        }
-
-        _interestGridBuiltAtTick = Tick;
-    }
-
-    private IEnumerable<World.Entity> EnumerateNearbyEntities(Vector2 center, float radius) {
-        var (centerX, centerY) = GetGridCell(center);
-        var cellRadius = (int)MathF.Ceiling(radius / SnapshotGridCellSize);
-        for (var y = centerY - cellRadius; y <= centerY + cellRadius; y++) {
-            for (var x = centerX - cellRadius; x <= centerX + cellRadius; x++) {
-                if (!_interestGrid.TryGetValue((x, y), out var entities)) {
-                    continue;
-                }
-
-                foreach (var entity in entities) {
-                    yield return entity;
-                }
-            }
-        }
-    }
-
-    private static (int X, int Y) GetGridCell(Vector2 position) {
-        var x = (int)MathF.Floor(position.X / SnapshotGridCellSize);
-        var y = (int)MathF.Floor(position.Y / SnapshotGridCellSize);
-        return (x, y);
-    }
-
-    private static Vector2 Flat(Vector3 position) => new(position.X, position.Z);
+    internal SnapshotBuilder.BroadcastBatch BeginSnapshotBatch() => _snapshotBuilder.BeginBroadcastBatch(Tick);
 }
