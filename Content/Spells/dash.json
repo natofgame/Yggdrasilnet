@@ -1,0 +1,18 @@
+{
+  "id": "dash",
+  "type": "Self",
+  "anticipationSeconds": 0.05,
+  "strikeSeconds": 0.1,
+  "impactSeconds": 0.05,
+  "returnSeconds": 0.1,
+  "skipReturnPhase": true,
+  "effects": [
+    {
+      "type": "Dash",
+      "amount": 8,
+      "duration": 0.4
+    }
+  ],
+  "range": 0,
+  "damage": 0
+}

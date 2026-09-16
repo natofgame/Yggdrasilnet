@@ -1,0 +1,10 @@
+{
+  "id": "heal",
+  "type": "Self",
+  "anticipationSeconds": 0.3,
+  "strikeSeconds": 0.1,
+  "impactSeconds": 0.1,
+  "returnSeconds": 0.3,
+  "range": 0,
+  "effects": [{ "type": "Heal", "amount": 30 }]
+}

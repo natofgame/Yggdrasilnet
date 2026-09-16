@@ -1,0 +1,14 @@
+{
+  "id": "fireball",
+  "type": "Projectile",
+  "anticipationSeconds": 0.4,
+  "strikeSeconds": 0.2,
+  "impactSeconds": 0.1,
+  "returnSeconds": 0.3,
+  "effects": [{ "type": "Damage", "amount": 25 }],
+  "range": 20,
+  "projectileEntityId": "fireball_projectile",
+  "projectileSpeed": 14,
+  "projectileLifetimeSeconds": 5,
+  "projectileHitRadius": 0.6
+}

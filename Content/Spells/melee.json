@@ -1,0 +1,10 @@
+{
+  "id": "melee",
+  "type": "Melee",
+  "anticipationSeconds": 0.15,
+  "strikeSeconds": 0.1,
+  "impactSeconds": 0.12,
+  "returnSeconds": 0.15,
+  "range": 1.5,
+  "effects": [{ "type": "Damage", "amount": 15 }]
+}

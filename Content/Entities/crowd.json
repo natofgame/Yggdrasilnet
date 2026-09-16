@@ -5,14 +5,23 @@
     {
       "type": "steering",
       "speed": 2.0,
-      "avoidRadius": 0,
-      "avoidWeight": 0,
+      "avoidRadius": 1,
+      "avoidWeight": 1.3,
       "seekWeight": 0,
-      "circleRadius": 0,
-      "circleWeight": 0,
-      "spawnSpacing": 4.0,
-      "wanderWeight": 0.6,
-      "wanderJitter": 1.5
+      "circleRadius": 3,
+      "circleWeight": 1.0,
+      "spawnSpacing": 0,
+      "wanderWeight": 0.5,
+      "wanderJitter": 0.5,
+      "hasPunch": true
+    },
+    { "type": "health", "max": 20 },
+    { "type": "target", "range": 20, "autocastersOnly": true },
+    { "type": "spellbook", "spells": ["fireball"] },
+    { "type":  "collision",
+      "x": 1,
+      "y": 2,
+      "z": 1
     }
   ]
 }
