@@ -11,11 +11,14 @@ public sealed class SnapshotBroadcastService(NetServer netServer, Simulation.Sim
     private const int SnapshotChunkSafetyMarginBytes = 96;
     private const int SnapshotBaseEntityBytes = 22;
     private const int SnapshotVelocityComponentBytes = 13;
+    private const int DespawnPacketHeaderBytes = 1 + sizeof(ushort);
 
     private uint _snapshotFrameId;
     private readonly SnapshotChunkPacket _chunk = new();
+    private readonly DespawnEntitiesPacket _despawn = new();
 
     public SnapshotBroadcastMetrics Broadcast() {
+        using var batch = simulation.BeginSnapshotBatch();
         var sessions = simulation.Sessions.All;
         if (sessions.Count == 0) {
             return default;
@@ -29,9 +32,9 @@ public sealed class SnapshotBroadcastService(NetServer netServer, Simulation.Sim
             Keyframe = isKeyframeTick
         };
 
-        using var batch = simulation.BeginSnapshotBatch();
         foreach (var session in sessions) {
             var snapshot = batch.Build(session, tickRate, isKeyframeTick);
+            SendRemovedEntities(session.Peer, batch.RemovedEntityIds, ref metrics);
             metrics.SnapshotEntities += snapshot.Entities.Count;
             if (snapshot.Entities.Count == 0) {
                 continue;
@@ -41,6 +44,32 @@ public sealed class SnapshotBroadcastService(NetServer netServer, Simulation.Sim
         }
 
         return metrics;
+    }
+
+    private void SendRemovedEntities(NetPeer peer, IReadOnlyList<int> entityIds, ref SnapshotBroadcastMetrics metrics) {
+        if (entityIds.Count == 0) {
+            return;
+        }
+
+        const DeliveryMethod delivery = DeliveryMethod.ReliableOrdered;
+        var targetBytes = ResolveChunkTargetBytes(peer, delivery);
+        var maxIdsPerPacket = Math.Max(1, (targetBytes - DespawnPacketHeaderBytes) / sizeof(int));
+        _despawn.EntityIds.Clear();
+        try {
+            for (var i = 0; i < entityIds.Count; i++) {
+                _despawn.EntityIds.Add(entityIds[i]);
+                if (_despawn.EntityIds.Count < maxIdsPerPacket && i < entityIds.Count - 1) {
+                    continue;
+                }
+
+                netServer.Send(peer, _despawn, delivery);
+                metrics.DespawnPacketsSent++;
+                metrics.DespawnEntities += _despawn.EntityIds.Count;
+                _despawn.EntityIds.Clear();
+            }
+        } finally {
+            _despawn.EntityIds.Clear();
+        }
     }
 
     private void SendSnapshotChunks(NetPeer peer, List<EntitySnapshot> entities, uint frameId, bool keyframeTick, ref SnapshotBroadcastMetrics metrics) {
@@ -122,5 +151,7 @@ public struct SnapshotBroadcastMetrics {
     public int SnapshotEntities { get; set; }
     public int ChunksSent { get; set; }
     public int DroppedOversizedEntities { get; set; }
+    public int DespawnPacketsSent { get; set; }
+    public int DespawnEntities { get; set; }
     public bool Keyframe { get; set; }
 }

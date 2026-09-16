@@ -1,8 +1,10 @@
 using System.Numerics;
+using System.Text;
 using Yggdrasilnet.Server.Simulation.Session;
 using Yggdrasilnet.Server.Simulation.World.Component;
 using Yggdrasilnet.Shared.Network.Packet.Packets;
 using Yggdrasilnet.Shared.Network.Packet.Snapshot;
+using NetworkComponents = Yggdrasilnet.Shared.Network.Packet.Snapshot.Components;
 
 namespace Yggdrasilnet.Server.Simulation.Snapshot;
 
@@ -13,6 +15,10 @@ public sealed class SnapshotBuilder(World.World world) {
     private const float SnapshotGridCellSize = 20f;
     private const int SnapshotBaseEntityBytes = 23;
     private const int SnapshotVelocityComponentBytes = 13;
+    private const int SnapshotActionComponentBytes = 14;
+    private const int SnapshotHealthComponentBytes = 9;
+    private const int SnapshotProjectileComponentBytes = 11;
+    private const int SnapshotCollisionComponentBytes = 21;
     private const int MaxEntitiesPerSnapshot = 220;
     private const int MaxFarthestTierEntitiesPerSnapshot = 32;
     private const int SentStateTimeToLiveSeconds = 3;
@@ -53,14 +59,29 @@ public sealed class SnapshotBuilder(World.World world) {
             throw new InvalidOperationException("A snapshot broadcast batch is already active.");
         }
 
+        var removedEntityIds = world.DrainRemovedEntityIds();
+        if (removedEntityIds.Count > 0) {
+            RecycleBuffers(_interestGrid, _interestBucketPool);
+            RecycleBuffers(_nearbyEntitiesByCell, _nearbyBufferPool);
+            _interestGridBuiltAtTick = -1;
+        }
+
         _broadcastBatchActive = true;
-        return new BroadcastBatch(this, tick, unchecked(++_broadcastBatchVersion));
+        return new BroadcastBatch(this, tick, unchecked(++_broadcastBatchVersion), removedEntityIds);
     }
 
-    internal readonly struct BroadcastBatch(SnapshotBuilder builder, long tick, int version) : IDisposable {
+    internal readonly struct BroadcastBatch(
+        SnapshotBuilder builder, long tick, int version, IReadOnlyList<int> removedEntityIds
+    ) : IDisposable {
+        public IReadOnlyList<int> RemovedEntityIds => removedEntityIds;
+
         public SnapshotPacket Build(PlayerSession session, int tickRate, bool forceFullSnapshot) {
             if (!builder._broadcastBatchActive || builder._broadcastBatchVersion != version) {
                 throw new ObjectDisposedException(nameof(BroadcastBatch));
+            }
+
+            foreach (var entityId in removedEntityIds) {
+                session.LastSentEntities.Remove(entityId);
             }
 
             return builder.BuildSnapshot(session, tick, tickRate, forceFullSnapshot, true);
@@ -141,7 +162,7 @@ public sealed class SnapshotBuilder(World.World world) {
                 }
 
                 var entity = nearbyEntities[index];
-                if (entity.Id == ownerEntity.Id) {
+                if (entity.Id == ownerEntity.Id || !world.TryGetEntity(entity.Id, out _)) {
                     continue;
                 }
 
@@ -169,11 +190,12 @@ public sealed class SnapshotBuilder(World.World world) {
                     continue;
                 }
 
-                if (!forceFullSnapshot && !IsEntityDueForSend(state, targetHz, tickRate, tick)) {
+                var combatChanged = state != null && HasCombatChange(entity, state);
+                if (!forceFullSnapshot && !combatChanged && !IsEntityDueForSend(state, targetHz, tickRate, tick)) {
                     continue;
                 }
 
-                if (!forceFullSnapshot && state != null && !HasSignificantChange(entity.Position, entityVelocity, state)) {
+                if (!forceFullSnapshot && !combatChanged && state != null && !HasSignificantChange(entity.Position, entityVelocity, state)) {
                     continue;
                 }
 
@@ -217,9 +239,43 @@ public sealed class SnapshotBuilder(World.World world) {
 
         foreach (var component in entity.Components) {
             if (component is INetworkedComponent networked) {
-                snapshot.Components.Add(networked);
-                snapshot.EstimatedBytes += networked.Type switch {
-                    NetworkedComponentType.Velocity => SnapshotVelocityComponentBytes,
+                var copy = networked switch {
+                    NetworkComponents.HealthComponent health => new NetworkComponents.HealthComponent {
+                        Current = health.Current,
+                        Max = health.Max
+                    },
+                    NetworkComponents.ProjectileComponent projectile => new NetworkComponents.ProjectileComponent {
+                        SpellId = projectile.SpellId,
+                        CasterEntityId = projectile.CasterEntityId,
+                        TargetEntityId = projectile.TargetEntityId
+                    },
+                    NetworkComponents.ActionComponent action => new NetworkComponents.ActionComponent {
+                        ActionType = action.ActionType,
+                        Phase = action.Phase,
+                        PhaseProgress01 = action.PhaseProgress01,
+                        SpellId = action.SpellId,
+                        TargetEntityId = action.TargetEntityId,
+                        SpellType = action.SpellType
+                    },
+                    NetworkComponents.CollisionComponent collision => new NetworkComponents.CollisionComponent() {
+                        X = collision.X,
+                        Y = collision.Y,
+                        Z = collision.Z,
+                        IsTrigger = collision.IsTrigger,
+                        Layer = collision.Layer,
+                        Mask = collision.Mask
+                    },
+                    _ => networked
+                };
+                snapshot.Components.Add(copy);
+                snapshot.EstimatedBytes += copy switch {
+                    NetworkComponents.HealthComponent => SnapshotHealthComponentBytes,
+                    NetworkComponents.ProjectileComponent projectile =>
+                        SnapshotProjectileComponentBytes + Encoding.UTF8.GetByteCount(projectile.SpellId),
+                    NetworkComponents.ActionComponent action =>
+                        SnapshotActionComponentBytes + Encoding.UTF8.GetByteCount(action.SpellId),
+                    NetworkComponents.CollisionComponent => SnapshotCollisionComponentBytes,
+                    _ when copy.Type == NetworkedComponentType.Velocity => SnapshotVelocityComponentBytes,
                     _ => 0
                 };
             }
@@ -272,6 +328,23 @@ public sealed class SnapshotBuilder(World.World world) {
         return velocityDeltaSquared >= VelocityDeltaThresholdSquared;
     }
 
+    private static bool HasCombatChange(World.Entity entity, SentEntityState state) {
+        return ReadHealthState(entity) != state.Health || ReadActionState(entity) != state.Action;
+    }
+
+    private static SentHealthState? ReadHealthState(World.Entity entity) {
+        return entity.TryGetComponent<HealthComponent>(out var health)
+            ? new SentHealthState(health.Current, health.Max)
+            : null;
+    }
+
+    private static SentActionState? ReadActionState(World.Entity entity) {
+        return entity.TryGetComponent<ActionStateComponent>(out var action)
+            ? new SentActionState(action.ActionType, action.Phase, action.PhaseProgress01,
+                action.SpellId, action.TargetEntityId, action.SpellType)
+            : null;
+    }
+
     private static void UpsertSentState(Dictionary<int, SentEntityState> sentStates, World.Entity entity, Vector3 velocity, long tick, bool fullSnapshot) {
         if (!sentStates.TryGetValue(entity.Id, out var state)) {
             state = new SentEntityState();
@@ -280,6 +353,8 @@ public sealed class SnapshotBuilder(World.World world) {
 
         state.Position = entity.Position;
         state.Velocity = velocity;
+        state.Health = ReadHealthState(entity);
+        state.Action = ReadActionState(entity);
         state.LastSentTick = tick;
         state.LastObservedTick = tick;
         if (fullSnapshot) {
