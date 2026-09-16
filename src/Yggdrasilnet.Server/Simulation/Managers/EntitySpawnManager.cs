@@ -25,11 +25,13 @@ public sealed class EntitySpawnManager(
             return;
         }
 
+        entityDefinitions.TryGetIndex(definitionId, out var definitionIndex);
+
         var random = new Random();
         var spawnPositions = BuildSpawnPositions(definitionId, definition, count, random);
         for (var i = 0; i < spawnPositions.Count; i++) {
             var position = spawnPositions[i];
-            entityFactory.Create(definition, world, position);
+            entityFactory.Create(definition, world, position, definitionIndex);
         }
 
         Log.Information("Spawned {Count} '{DefinitionId}' entities ({Total} total entities now)",

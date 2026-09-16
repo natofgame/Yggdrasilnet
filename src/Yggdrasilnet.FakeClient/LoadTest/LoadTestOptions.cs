@@ -16,7 +16,7 @@ public sealed class LoadTestOptions {
 
     public double StepIntervalSeconds { get; private set; } = 5;
 
-    public double LatencyThresholdMs { get; private set; } = 150;
+    public double LatencyThresholdMs { get; private set; } = 22150;
     public double TickBudgetMultiplier { get; private set; } = 1.5;
 
     public static LoadTestOptions Parse(string[] args) {

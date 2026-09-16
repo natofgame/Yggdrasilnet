@@ -1,12 +1,20 @@
 ﻿using System.Collections.Generic;
 using System.Numerics;
 using LiteNetLib;
+using Yggdrasilnet.Shared.Spell;
 
 namespace Yggdrasilnet.Server.Simulation.Session;
+
+public readonly record struct SentHealthState(float Current, float Max);
+
+public readonly record struct SentActionState(
+    byte ActionType, SpellPhase Phase, float PhaseProgress01, string SpellId, int TargetEntityId, SpellType SpellType);
 
 public sealed class SentEntityState {
     public Vector3 Position { get; set; }
     public Vector3 Velocity { get; set; }
+    public SentHealthState? Health { get; set; }
+    public SentActionState? Action { get; set; }
     public long LastSentTick { get; set; }
     public long LastObservedTick { get; set; }
     public long LastFullSentTick { get; set; }

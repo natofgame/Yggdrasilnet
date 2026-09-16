@@ -2,6 +2,14 @@
   "id": "player",
   "components": [
     { "type": "velocity", "speed": 0 },
-    { "type": "input", "speed":  3}
+    { "type": "input", "speed":  3},
+    { "type": "health", "max": 10000 },
+    { "type": "spellbook", "spells": ["fireball", "dash", "melee"] },
+    { "type": "steering", "speed":  3},
+    { "type":  "collision", 
+      "x": 1,
+      "y": 2,
+      "z": 1
+    }
   ]
 }

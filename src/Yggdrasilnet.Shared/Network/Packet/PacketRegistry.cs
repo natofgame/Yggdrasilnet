@@ -13,6 +13,9 @@ public sealed class PacketRegistry {
         Register(PacketType.Input, () => new InputPacket());
         Register(PacketType.SpawnEntities, () => new SpawnEntitiesPacket());
         Register(PacketType.Stats, () => new StatsPacket());
+        Register(PacketType.EntityDefinitions, () => new EntityDefinitionsPacket());
+        Register(PacketType.CastSpell, () => new CastSpellPacket());
+        Register(PacketType.DespawnEntities, () => new DespawnEntitiesPacket());
     }
 
     public void Register(PacketType type, Func<IPacket> factory) {

@@ -4,6 +4,7 @@ using System.Reflection;
 using Yggdrasilnet.Server.Simulation.World;
 using Yggdrasilnet.Server.Simulation.World.Component;
 using Yggdrasilnet.Server.Simulation.World.System;
+using Yggdrasilnet.Server.Simulation.World.System.Physic;
 using Yggdrasilnet.Server.Simulation.World.System.Steering;
 
 namespace Yggdrasilnet.Server.Tests;

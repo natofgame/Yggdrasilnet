@@ -6,22 +6,17 @@ namespace Yggdrasilnet.Server.Simulation.World.System;
 public class PlayerMovementSystem : ISystem {
     public void Update(World world, float deltaTime) {
         foreach (var (entity, input) in world.Query<InputComponent>()) {
-            if (!entity.TryGetComponent<VelocityComponent>(out var velocity)) {
+            if (!entity.TryGetComponent<SteeringComponent>(out var steering)) {
                 continue;
             }
 
-            var direction = new Vector2(input.MoveX, input.MoveZ);
-            if (direction.LengthSquared() > 1f) {
-                direction = Vector2.Normalize(direction);
-            } else if (direction.LengthSquared() <= 0f) {
-                velocity.X = 0f;
-                velocity.Z = 0f;
-                continue;
-            }
+            var dir = new Vector2(input.MoveX, input.MoveZ);
 
-            velocity.X = direction.X * input.Speed;
-            velocity.Z = direction.Y * input.Speed;
+            if (dir.LengthSquared() > 1f)
+                dir = Vector2.Normalize(dir);
 
+            steering.InputDirection = dir;
+            steering.MoveSpeed = input.Speed;
         }
     }
 }
