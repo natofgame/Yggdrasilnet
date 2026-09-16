@@ -8,4 +8,6 @@ public enum PacketType : byte {
     Stats = 4,
     SnapshotChunk = 5,
     EntityDefinitions = 6,
+    CastSpell = 7,
+    DespawnEntities = 8
 }

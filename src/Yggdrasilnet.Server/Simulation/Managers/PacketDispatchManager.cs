@@ -1,6 +1,9 @@
 using System.Collections.Concurrent;
 using Serilog;
 using Yggdrasilnet.Server.Handlers;
+using Yggdrasilnet.Server.Simulation.Content;
+using Yggdrasilnet.Server.Simulation.Content.Spell.Definitions;
+using ContentSpell = Yggdrasilnet.Server.Simulation.Content.Spell;
 using Yggdrasilnet.Shared.Network;
 using Yggdrasilnet.Shared.Network.Packet;
 
@@ -10,12 +13,13 @@ public sealed class PacketDispatchManager {
     private readonly PacketDispatcher<ISimulationContext> _dispatcher = new();
     private readonly PlayerSimulationManager _playerSimulation;
 
-    public PacketDispatchManager(PlayerSimulationManager playerSimulation) {
+    public PacketDispatchManager(PlayerSimulationManager playerSimulation, DefinitionRegistry<SpellDefinition> spellDefinitions) {
         _playerSimulation = playerSimulation;
 
         _dispatcher.Register(PacketType.PlayerConnexion, new PlayerConnexionHandler());
         _dispatcher.Register(PacketType.Input, new InputHandler());
         _dispatcher.Register(PacketType.SpawnEntities, new SpawnEntitiesHandler());
+        _dispatcher.Register(PacketType.CastSpell, new CastSpellHandler(spellDefinitions));
     }
 
     public void DrainIncomingEvents(ConcurrentQueue<ISimulationEvent> incomingEvents, ISimulationContext context, long tick) {
