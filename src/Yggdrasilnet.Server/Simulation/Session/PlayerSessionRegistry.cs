@@ -14,7 +14,12 @@ public sealed class PlayerSessionRegistry {
     }
 
     public bool Remove(NetPeer peer, out PlayerSession? session) {
-        return _sessions.Remove(peer, out session);
+        if (!_sessions.Remove(peer, out session)) {
+            return false;
+        }
+
+        session.LastSentEntities.Clear();
+        return true;
     }
 
     public bool TryGet(NetPeer peer, out PlayerSession? session) {
