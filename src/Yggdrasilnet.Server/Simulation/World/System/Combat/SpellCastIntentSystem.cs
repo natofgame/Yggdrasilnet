@@ -26,6 +26,7 @@ public sealed class SpellCastIntentSystem(DefinitionRegistry<SpellDefinition> sp
                 continue;
             }
 
+            var timing = spell.Timing;
             entity.AddComponent(new ActionStateComponent {
                 ActionType = 1,
                 Phase = SpellPhase.Anticipation,
@@ -33,8 +34,8 @@ public sealed class SpellCastIntentSystem(DefinitionRegistry<SpellDefinition> sp
                 SpellType = spell.Type,
                 CasterEntityId = entity.Id,
                 Context = context,
-                CurrentPhaseDuration = spell.AnticipationSeconds,
-                PhaseTimeRemaining = spell.AnticipationSeconds
+                CurrentPhaseDuration = timing.Anticipation,
+                PhaseTimeRemaining = timing.Anticipation
             });
         }
     }

@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
+using Serilog;
 using Yggdrasilnet.Server.Simulation.Content;
 using ContentEntity = Yggdrasilnet.Server.Simulation.Content.Entity;
 using Yggdrasilnet.Server.Simulation.Content.Spell;
@@ -68,7 +70,7 @@ public sealed class World(
 
     public void Update(float deltaTime) {
         _systemManager.Update(this, deltaTime);
-    }
+    } 
     
     public List<Entity> QueryBox(
         BoundingBoxes box,
@@ -78,12 +80,14 @@ public sealed class World(
 
         foreach (var (entity, collider) in Query<CollisionComponent>()) {
             if (filter is not null && !filter(entity, collider)) {
+                Console.WriteLine("Filter: " + entity.Id);
                 continue;
             }
 
             var entityBox = collider.GetWorldBoundingBoxes(entity.Position);
             if (box.Intersects(entityBox)) {
                 results.Add(entity);
+                Console.WriteLine("Query: " + entity.Id);
             }
         }
 
@@ -96,11 +100,9 @@ public sealed class World(
         AddSystem(new MovementSystem());
         AddSystem(new CollisionSystem());
         
-        var phaseSystem = new SpellPhaseSystem(_spellDefinitions, new SpellProjectileSpawner(_entityDefinitions));
+        var phaseSystem = new SpellPhaseSystem(_spellDefinitions);
         AddSystem(phaseSystem);
-        
         AddSystem(new SpellCastIntentSystem(_spellDefinitions, phaseSystem));
-        AddSystem(new ProjectileSystem(_spellDefinitions, new SpellEffectResolver()));
         AddSystem(new DeathSystem());
     }
 }

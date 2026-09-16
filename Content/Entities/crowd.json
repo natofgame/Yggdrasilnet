@@ -16,12 +16,12 @@
       "hasPunch": true
     },
     { "type": "health", "max": 20 },
-    { "type": "target", "range": 20, "autocastersOnly": true },
     { "type": "spellbook", "spells": ["fireball"] },
     { "type":  "collision",
       "x": 1,
       "y": 2,
-      "z": 1
+      "z": 1,
+      "layer": "monster"
     }
   ]
 }

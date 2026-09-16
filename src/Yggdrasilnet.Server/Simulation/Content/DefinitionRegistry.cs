@@ -22,7 +22,6 @@ public sealed class DefinitionRegistry<T> where T : IDefinition {
                 throw new InvalidDataException($"Content file '{file}' must contain a definition.");
             }
 
-            ContentValidator.Validate(definition);
             _definitions[definition.Id] = definition;
 
             if (!_indexById.ContainsKey(definition.Id)) {

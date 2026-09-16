@@ -44,8 +44,7 @@ public sealed class Simulation : ISimulationContext {
     public Simulation() {
         _entityDefinitions.Load(ContentPaths.Resolve("Entities"));
         _spellDefinitions.Load(ContentPaths.Resolve("Spells"));
-        ContentValidator.Validate(_entityDefinitions, _spellDefinitions);
-
+      
         _world = new World.World(_spellDefinitions, _entityDefinitions);
         _world.Load();
         _snapshotBuilder = new SnapshotBuilder(_world);

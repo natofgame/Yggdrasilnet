@@ -19,6 +19,7 @@ public sealed class SnapshotBuilder(World.World world) {
     private const int SnapshotHealthComponentBytes = 9;
     private const int SnapshotProjectileComponentBytes = 11;
     private const int SnapshotCollisionComponentBytes = 21;
+    private const int SnapshotDirectionComponentBytes = 8;
     private const int MaxEntitiesPerSnapshot = 220;
     private const int MaxFarthestTierEntitiesPerSnapshot = 32;
     private const int SentStateTimeToLiveSeconds = 3;
@@ -238,47 +239,54 @@ public sealed class SnapshotBuilder(World.World world) {
         snapshot.DefinitionId = entity.DefinitionIndex;
 
         foreach (var component in entity.Components) {
-            if (component is INetworkedComponent networked) {
-                var copy = networked switch {
-                    NetworkComponents.HealthComponent health => new NetworkComponents.HealthComponent {
-                        Current = health.Current,
-                        Max = health.Max
-                    },
-                    NetworkComponents.ProjectileComponent projectile => new NetworkComponents.ProjectileComponent {
-                        SpellId = projectile.SpellId,
-                        CasterEntityId = projectile.CasterEntityId,
-                        TargetEntityId = projectile.TargetEntityId
-                    },
-                    NetworkComponents.ActionComponent action => new NetworkComponents.ActionComponent {
-                        ActionType = action.ActionType,
-                        Phase = action.Phase,
-                        PhaseProgress01 = action.PhaseProgress01,
-                        SpellId = action.SpellId,
-                        TargetEntityId = action.TargetEntityId,
-                        SpellType = action.SpellType
-                    },
-                    NetworkComponents.CollisionComponent collision => new NetworkComponents.CollisionComponent() {
-                        X = collision.X,
-                        Y = collision.Y,
-                        Z = collision.Z,
-                        IsTrigger = collision.IsTrigger,
-                        Layer = collision.Layer,
-                        Mask = collision.Mask
-                    },
-                    _ => networked
-                };
-                snapshot.Components.Add(copy);
-                snapshot.EstimatedBytes += copy switch {
-                    NetworkComponents.HealthComponent => SnapshotHealthComponentBytes,
-                    NetworkComponents.ProjectileComponent projectile =>
-                        SnapshotProjectileComponentBytes + Encoding.UTF8.GetByteCount(projectile.SpellId),
-                    NetworkComponents.ActionComponent action =>
-                        SnapshotActionComponentBytes + Encoding.UTF8.GetByteCount(action.SpellId),
-                    NetworkComponents.CollisionComponent => SnapshotCollisionComponentBytes,
-                    _ when copy.Type == NetworkedComponentType.Velocity => SnapshotVelocityComponentBytes,
-                    _ => 0
-                };
+            if (component is not INetworkedComponent networked) {
+                continue;
             }
+
+            var copy = networked switch {
+                NetworkComponents.HealthComponent health => new NetworkComponents.HealthComponent {
+                    Current = health.Current,
+                    Max = health.Max
+                },
+                NetworkComponents.ProjectileComponent projectile => new NetworkComponents.ProjectileComponent {
+                    SpellId = projectile.SpellId,
+                    CasterEntityId = projectile.CasterEntityId,
+                    TargetEntityId = projectile.TargetEntityId
+                },
+                NetworkComponents.ActionComponent action => new NetworkComponents.ActionComponent {
+                    ActionType = action.ActionType,
+                    Phase = action.Phase,
+                    PhaseProgress01 = action.PhaseProgress01,
+                    SpellId = action.SpellId,
+                    TargetEntityId = action.TargetEntityId,
+                    SpellType = action.SpellType
+                },
+                NetworkComponents.CollisionComponent collision => new NetworkComponents.CollisionComponent() {
+                    X = collision.X,
+                    Y = collision.Y,
+                    Z = collision.Z,
+                    IsTrigger = collision.IsTrigger,
+                    Layer = collision.Layer,
+                    Mask = collision.Mask
+                },
+                NetworkComponents.DirectionComponent direction => new NetworkComponents.DirectionComponent() {
+                    X  = direction.X,
+                    Z  = direction.Z,
+                },
+                _ => networked
+            };
+            snapshot.Components.Add(copy);
+            snapshot.EstimatedBytes += copy switch {
+                NetworkComponents.HealthComponent => SnapshotHealthComponentBytes,
+                NetworkComponents.ProjectileComponent projectile =>
+                    SnapshotProjectileComponentBytes + Encoding.UTF8.GetByteCount(projectile.SpellId),
+                NetworkComponents.ActionComponent action =>
+                    SnapshotActionComponentBytes + Encoding.UTF8.GetByteCount(action.SpellId),
+                NetworkComponents.CollisionComponent => SnapshotCollisionComponentBytes,
+                NetworkComponents.DirectionComponent => SnapshotDirectionComponentBytes,
+                _ when copy.Type == NetworkedComponentType.Velocity => SnapshotVelocityComponentBytes,
+                _ => 0
+            };
         }
 
         if (entity.TryGetComponent<InputComponent>(out var input)) {

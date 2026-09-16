@@ -14,6 +14,7 @@ public sealed class NetworkedComponentRegistry {
         registry.Register(NetworkedComponentType.Health, () => new Components.HealthComponent());
         registry.Register(NetworkedComponentType.Projectile, () => new Components.ProjectileComponent());
         registry.Register(NetworkedComponentType.Collision, () => new CollisionComponent());
+        registry.Register(NetworkedComponentType.Direction, (() => new DirectionComponent()));
         return registry;
     }
 

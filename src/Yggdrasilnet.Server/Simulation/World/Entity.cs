@@ -17,6 +17,8 @@ public sealed class Entity {
     public Entity(int id, Vector3 position = default) {
         Id = id;
         Position = position;
+        
+        AddComponent(new DirectionComponent());
     }
 
     public void AddComponent(IComponent component) {

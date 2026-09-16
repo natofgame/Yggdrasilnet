@@ -3,7 +3,7 @@ using System.Globalization;
 namespace Yggdrasilnet.FakeClient.LoadTest;
 
 public sealed class LoadTestOptions {
-    public string Host { get; private set; } = "90.45.175.116";
+    public string Host { get; private set; } = "127.0.0.1";
     public int Port { get; private set; } = 9050;
 
     public int StartClients { get; private set; } = 1;

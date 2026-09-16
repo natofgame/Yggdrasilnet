@@ -8,11 +8,10 @@ using Yggdrasilnet.Shared.Spell;
 namespace Yggdrasilnet.Server.Simulation.World.System.Combat;
 
 public sealed class SpellPhaseSystem(
-    DefinitionRegistry<SpellDefinition> spellDefinitions,
-    SpellProjectileSpawner projectileSpawner
+    DefinitionRegistry<SpellDefinition> spellDefinitions
 ) : ISystem {
-    private readonly SpellDeliveryResolver _delivery = new(projectileSpawner, new SpellEffectResolver());
-
+    private readonly SpellCastPipeline _pipeline = new();
+    
     public void Update(World world, float deltaTime) {
         if (!float.IsFinite(deltaTime) || deltaTime < 0f) {
             return;
@@ -40,7 +39,7 @@ public sealed class SpellPhaseSystem(
                 }
                 remaining -= MathF.Max(0f, action.PhaseTimeRemaining);
                 if (action.Phase == SpellPhase.Strike) {
-                    _delivery.Deliver(world, action.Context, spell);
+                    _pipeline.Cast(world, entity, spell);
                 }
                 action.Phase = action.Phase switch {
                     SpellPhase.Anticipation => SpellPhase.Strike,
@@ -52,10 +51,12 @@ public sealed class SpellPhaseSystem(
                     Reset(action);
                     break;
                 }
+
+                var timing = spell.Timing;
                 action.CurrentPhaseDuration = action.Phase switch {
-                    SpellPhase.Strike => spell.StrikeSeconds,
-                    SpellPhase.Impact => spell.ImpactSeconds,
-                    SpellPhase.Return => spell.ReturnSeconds,
+                    SpellPhase.Strike => timing.Strike,
+                    SpellPhase.Impact => timing.Impact,
+                    SpellPhase.Return => timing.Return,
                     _ => 0f
                 };
                 action.PhaseTimeRemaining = action.CurrentPhaseDuration;
