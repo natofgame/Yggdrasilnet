@@ -1,17 +1,32 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
+using Yggdrasilnet.Server.Simulation.Content;
+using ContentEntity = Yggdrasilnet.Server.Simulation.Content.Entity;
+using Yggdrasilnet.Server.Simulation.Content.Spell;
+using Yggdrasilnet.Server.Simulation.Content.Spell.Definitions;
+using Yggdrasilnet.Server.Simulation.Content.Spell.Effect;
 using Yggdrasilnet.Server.Simulation.World.Component;
 using Yggdrasilnet.Server.Simulation.World.Managers;
 using Yggdrasilnet.Server.Simulation.World.System;
+using Yggdrasilnet.Server.Simulation.World.System.Combat;
+using Yggdrasilnet.Server.Simulation.World.System.Physic;
+using Yggdrasilnet.Server.Simulation.World.System.Physic.Collision;
 using Yggdrasilnet.Server.Simulation.World.System.Steering;
+using Yggdrasilnet.Shared.Maths;
 
 namespace Yggdrasilnet.Server.Simulation.World;
 
-public sealed class World {
+public sealed class World(
+    DefinitionRegistry<SpellDefinition>? spellDefinitions = null,
+    DefinitionRegistry<ContentEntity.EntityDefinition>? entityDefinitions = null
+) {
+    private readonly DefinitionRegistry<SpellDefinition> _spellDefinitions = spellDefinitions ?? new DefinitionRegistry<SpellDefinition>();
+    private readonly DefinitionRegistry<ContentEntity.EntityDefinition> _entityDefinitions = entityDefinitions ?? new DefinitionRegistry<ContentEntity.EntityDefinition>();
     private readonly EntityManager _entityManager = new();
     private readonly EntityQueryCache _queryCache = new();
     private readonly SystemManager _systemManager = new();
     private Action<Type>? _componentStructureChanged;
+    private readonly List<int> _removedEntityIds = [];
 
     public IReadOnlyCollection<Entity> Entities => _entityManager.Entities;
 
@@ -33,7 +48,14 @@ public sealed class World {
         }
 
         _queryCache.InvalidateAll();
+        _removedEntityIds.Add(entityId);
         return true;
+    }
+
+    public IReadOnlyList<int> DrainRemovedEntityIds() {
+        var removed = _removedEntityIds.ToArray();
+        _removedEntityIds.Clear();
+        return removed;
     }
 
     public bool TryGetEntity(int entityId, [NotNullWhen(true)] out Entity? entity) {
@@ -47,10 +69,38 @@ public sealed class World {
     public void Update(float deltaTime) {
         _systemManager.Update(this, deltaTime);
     }
+    
+    public List<Entity> QueryBox(
+        BoundingBoxes box,
+        Func<Entity, CollisionComponent, bool>? filter = null
+    ) {
+        var results = new List<Entity>();
+
+        foreach (var (entity, collider) in Query<CollisionComponent>()) {
+            if (filter is not null && !filter(entity, collider)) {
+                continue;
+            }
+
+            var entityBox = collider.GetWorldBoundingBoxes(entity.Position);
+            if (box.Intersects(entityBox)) {
+                results.Add(entity);
+            }
+        }
+
+        return results;
+    }
 
     public void Load() {
         AddSystem(new PlayerMovementSystem());
         AddSystem(new SteeringSystem());
         AddSystem(new MovementSystem());
+        AddSystem(new CollisionSystem());
+        
+        var phaseSystem = new SpellPhaseSystem(_spellDefinitions, new SpellProjectileSpawner(_entityDefinitions));
+        AddSystem(phaseSystem);
+        
+        AddSystem(new SpellCastIntentSystem(_spellDefinitions, phaseSystem));
+        AddSystem(new ProjectileSystem(_spellDefinitions, new SpellEffectResolver()));
+        AddSystem(new DeathSystem());
     }
 }

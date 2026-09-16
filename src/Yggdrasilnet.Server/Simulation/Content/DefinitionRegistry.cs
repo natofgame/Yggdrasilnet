@@ -1,10 +1,12 @@
 ﻿using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Yggdrasilnet.Server.Simulation.Content;
 
 internal static class DefinitionJson {
     public static readonly JsonSerializerOptions Options = new() {
-        PropertyNameCaseInsensitive = true
+        PropertyNameCaseInsensitive = true,
+        Converters = { new JsonStringEnumConverter() }
     };
 }
 
@@ -17,9 +19,10 @@ public sealed class DefinitionRegistry<T> where T : IDefinition {
         foreach (var file in Directory.GetFiles(path, "*.json").OrderBy(f => f, StringComparer.Ordinal)) {
             var definition = JsonSerializer.Deserialize<T>(File.ReadAllText(file), DefinitionJson.Options);
             if (definition is null) {
-                continue;
+                throw new InvalidDataException($"Content file '{file}' must contain a definition.");
             }
 
+            ContentValidator.Validate(definition);
             _definitions[definition.Id] = definition;
 
             if (!_indexById.ContainsKey(definition.Id)) {
@@ -39,6 +42,16 @@ public sealed class DefinitionRegistry<T> where T : IDefinition {
 
     public bool TryGetIndex(string id, out byte index) {
         return _indexById.TryGetValue(id, out index);
+    }
+
+    public bool TryGetId(byte index, out string id) {
+        if (index < _idsByIndex.Count) {
+            id = _idsByIndex[index];
+            return true;
+        }
+
+        id = string.Empty;
+        return false;
     }
 
     public IEnumerable<(byte Index, string Id)> Entries {

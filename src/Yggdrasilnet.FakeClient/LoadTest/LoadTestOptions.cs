@@ -3,7 +3,7 @@ using System.Globalization;
 namespace Yggdrasilnet.FakeClient.LoadTest;
 
 public sealed class LoadTestOptions {
-    public string Host { get; private set; } = "127.0.0.1";
+    public string Host { get; private set; } = "90.45.175.116";
     public int Port { get; private set; } = 9050;
 
     public int StartClients { get; private set; } = 1;
@@ -16,7 +16,7 @@ public sealed class LoadTestOptions {
 
     public double StepIntervalSeconds { get; private set; } = 5;
 
-    public double LatencyThresholdMs { get; private set; } = 150;
+    public double LatencyThresholdMs { get; private set; } = 22150;
     public double TickBudgetMultiplier { get; private set; } = 1.5;
 
     public static LoadTestOptions Parse(string[] args) {

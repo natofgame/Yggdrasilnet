@@ -1,9 +1,11 @@
 using System.Collections.Concurrent;
 using Yggdrasilnet.Server.Services;
 using Yggdrasilnet.Server.Simulation.Content;
+using Yggdrasilnet.Server.Simulation.Content.Spell.Definitions;
 using Yggdrasilnet.Server.Simulation.Managers;
 using Yggdrasilnet.Server.Simulation.Snapshot;
 using ContentEntity = Yggdrasilnet.Server.Simulation.Content.Entity;
+using ContentSpell = Yggdrasilnet.Server.Simulation.Content.Spell;
 using Yggdrasilnet.Server.Simulation.Session;
 using Yggdrasilnet.Server.Utils;
 using Yggdrasilnet.Shared.Network.Packet.Packets;
@@ -18,6 +20,7 @@ public sealed class Simulation : ISimulationContext {
     private readonly SnapshotBuilder _snapshotBuilder;
 
     private readonly DefinitionRegistry<ContentEntity.EntityDefinition> _entityDefinitions = new();
+    private readonly DefinitionRegistry<SpellDefinition> _spellDefinitions = new();
     private readonly EntitySpawnManager _entitySpawnManager;
     private readonly PlayerSimulationManager _playerSimulationManager;
     private readonly PacketDispatchManager _packetDispatchManager;
@@ -39,16 +42,19 @@ public sealed class Simulation : ISimulationContext {
     public World.World World => _world;
 
     public Simulation() {
-        _world = new World.World();
+        _entityDefinitions.Load(ContentPaths.Resolve("Entities"));
+        _spellDefinitions.Load(ContentPaths.Resolve("Spells"));
+        ContentValidator.Validate(_entityDefinitions, _spellDefinitions);
+
+        _world = new World.World(_spellDefinitions, _entityDefinitions);
         _world.Load();
         _snapshotBuilder = new SnapshotBuilder(_world);
 
-        _entityDefinitions.Load(ContentPaths.Resolve("Entities"));
         var entityFactory = new EntityFactory();
 
         _entitySpawnManager = new EntitySpawnManager(_entityDefinitions, entityFactory, _world);
         _playerSimulationManager = new PlayerSimulationManager(_sessions, _entityDefinitions, entityFactory, _world);
-        _packetDispatchManager = new PacketDispatchManager(_playerSimulationManager);
+        _packetDispatchManager = new PacketDispatchManager(_playerSimulationManager, _spellDefinitions);
 
         SpawnEntities("crowd", ReadCrowdSizeFromEnv());
     }
