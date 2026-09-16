@@ -1,4 +1,6 @@
-﻿namespace Yggdrasilnet.Shared.Network.Packet.Snapshot;
+﻿using Yggdrasilnet.Shared.Network.Packet.Snapshot.Components;
+
+namespace Yggdrasilnet.Shared.Network.Packet.Snapshot;
 
 public sealed class NetworkedComponentRegistry {
     private static readonly Lazy<NetworkedComponentRegistry> DefaultInstance = new(CreateDefault);
@@ -8,6 +10,10 @@ public sealed class NetworkedComponentRegistry {
     private static NetworkedComponentRegistry CreateDefault() {
         var registry = new NetworkedComponentRegistry();
         registry.Register(NetworkedComponentType.Velocity, () => new Components.VelocityComponent());
+        registry.Register(NetworkedComponentType.Action, () => new Components.ActionComponent());
+        registry.Register(NetworkedComponentType.Health, () => new Components.HealthComponent());
+        registry.Register(NetworkedComponentType.Projectile, () => new Components.ProjectileComponent());
+        registry.Register(NetworkedComponentType.Collision, () => new CollisionComponent());
         return registry;
     }
 
