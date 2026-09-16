@@ -1,5 +1,6 @@
 using System.Numerics;
 using Yggdrasilnet.Server.Simulation.World.Component;
+using Yggdrasilnet.Server.Simulation.World.System.Physic.Steering;
 using Yggdrasilnet.Server.Simulation.World.System.Steering.Behaviors;
 
 namespace Yggdrasilnet.Server.Simulation.World.System.Steering;
@@ -89,12 +90,22 @@ public sealed class SteeringSystem : ISystem {
     }
 
     private void RunBehaviors(SteeringAgent agent) {
+        var steering = agent.Steering;
+        if (steering.HasDash || steering.PunchTimer > 0f || steering.PunchFreezeTimer > 0f) {
+            ApplySteeringVelocity(agent, Vector2.Zero, _context.DeltaTime);
+            return;
+        }
+
         var steer = Vector2.Zero;
+        if (steering.InputDirection.LengthSquared() > 0f) {
+            steer += steering.InputDirection * steering.MoveSpeed;
+        }
+
         for (var i = 0; i < Behaviors.Length; i++) {
             Behaviors[i].Apply(_context, agent, ref steer);
         }
 
-        ApplySteeringVelocity(agent, steer);
+        ApplySteeringVelocity(agent, steer, _context.DeltaTime);
     }
 
     private void PrepareDirection(Vector2 agentPosition, Vector2 targetPosition) {
@@ -123,7 +134,47 @@ public sealed class SteeringSystem : ISystem {
         return 3;
     }
 
-    private static void ApplySteeringVelocity(SteeringAgent agent, Vector2 steer) {
+    private static void ApplySteeringVelocity(SteeringAgent agent, Vector2 steer, float deltaTime) {
+        var steering = agent.Steering;
+        if (steering.HasDash) {
+            steering.DashTimer -= deltaTime;
+
+            if (steering.DashTimer <= 0f) {
+                steering.HasDash = false;
+                agent.Velocity.X = 0f;
+                agent.Velocity.Z = 0f;
+                return;
+            }
+
+            agent.Velocity.X = steering.DashDirection.X * steering.DashSpeed;
+            agent.Velocity.Z = steering.DashDirection.Y * steering.DashSpeed;
+
+            return;
+        }
+        
+        if (steering.PunchTimer > 0f) {
+            steering.PunchTimer -= deltaTime;
+
+            agent.Velocity.X =
+                steering.PunchDirection.X * steering.PunchOverrideSpeed;
+
+            agent.Velocity.Z =
+                steering.PunchDirection.Y * steering.PunchOverrideSpeed;
+
+            return;
+        }
+
+        if (steering.PunchFreezeTimer > 0f) {
+            steering.PunchFreezeTimer -= deltaTime;
+
+            agent.Velocity.X = 0f;
+            agent.Velocity.Z = 0f;
+
+            return;
+        }
+        steering.HasPunch = false;
+        steering.PunchOverrideSpeed = 0f;
+        
         var steerLengthSquared = steer.LengthSquared();
         if (steerLengthSquared <= SteeringConstants.MinDistanceSquared) {
             agent.Velocity.X = 0f;

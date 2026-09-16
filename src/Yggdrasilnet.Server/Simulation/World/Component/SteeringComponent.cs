@@ -1,3 +1,5 @@
+using System.Numerics;
+
 namespace Yggdrasilnet.Server.Simulation.World.Component;
 
 public sealed class SteeringComponent : IComponent {
@@ -22,4 +24,18 @@ public sealed class SteeringComponent : IComponent {
     public float RoamRadius { get; set; }
     public float SpawnX { get; set; }
     public float SpawnZ { get; set; }
+    
+    public bool HasPunch;
+    public Vector2 PunchDirection;
+
+    public float PunchOverrideSpeed;
+    public float PunchTimer;
+    public float PunchFreezeTimer;
+
+    public bool HasDash;
+    public Vector2 DashDirection;
+    public float DashSpeed;
+    public float DashTimer;
+    
+    public Vector2 InputDirection;
 }
