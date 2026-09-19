@@ -67,7 +67,17 @@ public sealed class AiComponentDefinition : EntityComponentDefinition {
     public float Prudence { get; set; } = 0f;
     public float Impulsivity { get; set; } = 0f;
     public float Aggressivity { get; set; } = 0f;
-    public float Courage  { get; set; } = 0f;
+    public float Courage { get; set; } = 0f;
     public float Curiosity { get; set; } = 0f;
     public float Discipline { get; set; } = 0f;
+
+    public float SightRange { get; set; } = 20f;
+    public float PerceptionInterval { get; set; } = 0.2f;
+
+    public float SurprisedDuration { get; set; } = 0.4f;
+    public float FearDuration { get; set; } = 2.5f;
+    public float FearRadius { get; set; } = 8f;
+    public float WanderRadius { get; set; } = 6f;
+    public float WanderArriveDistance { get; set; } = 0.5f;
+    public float WanderIdleDuration { get; set; } = 2f;
 }
