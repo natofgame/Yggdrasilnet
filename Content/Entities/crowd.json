@@ -4,19 +4,18 @@
     { "type": "velocity", "speed": 0 },
     {
       "type": "steering",
-      "speed": 2.0,
-      "avoidRadius": 1,
-      "avoidWeight": 1.3,
-      "seekWeight": 0,
-      "circleRadius": 3,
-      "circleWeight": 1.0,
-      "spawnSpacing": 0,
-      "wanderWeight": 0.5,
-      "wanderJitter": 0.5,
       "hasPunch": true
     },
+    {
+      "type": "ai",
+      "prudence": 0,
+      "impulsivity": 3,
+      "aggressivity": 3,
+      "courage": 10,
+      "curiosity": 1
+    },
     { "type": "health", "max": 20 },
-    { "type": "spellbook", "spells": ["fireball"] },
+    { "type": "spellbook", "spells": ["slime_melee", "dash", "melee"] },
     { "type":  "collision",
       "x": 1,
       "y": 2,

@@ -1,5 +1,6 @@
 ﻿using System.Numerics;
 using Yggdrasilnet.Server.Simulation.Content.Spell.Definitions;
+using Yggdrasilnet.Server.Simulation.World.Component;
 using Yggdrasilnet.Shared.Compatibility;
 using Yggdrasilnet.Shared.Maths;
 
@@ -11,7 +12,8 @@ public static class SpellTargetResolver {
         var origin = context.Origin + context.Direction * targeting.Range;
         var (min, max) = ResolveHitBox(targeting, context.Direction);
         var box = new BoundingBoxes(origin + min, origin + max);
-        return world.QueryBox(box, (e, c) => c.Layer == CollisionLayer.Monster && e != caster);
+        var enemyLayer = ResolveEnemyLayer(caster);
+        return world.QueryBox(box, (e, c) => c.Layer == enemyLayer && e != caster);
     }
 
     private static (Vector3 Min, Vector3 Max) ResolveHitBox(SpellTargeting targeting, Vector3 direction) {
@@ -24,7 +26,13 @@ public static class SpellTargetResolver {
         var total = absX + absZ;
         var t = total > 0.0001f ? absZ / total : 0f;
         t = t * t * (3f - 2f * t);
-
         return (Vector3.Lerp(targeting.HitBoxMin, cardMin, t), Vector3.Lerp(targeting.HitBoxMax, cardMax, t));
+    }
+    
+    public static CollisionLayer ResolveEnemyLayer(World.Entity caster) {
+        if (caster.TryGetComponent<CollisionComponent>(out var collider) && collider.Layer == CollisionLayer.Player) {
+            return CollisionLayer.Monster;
+        }
+        return CollisionLayer.Player;
     }
 }

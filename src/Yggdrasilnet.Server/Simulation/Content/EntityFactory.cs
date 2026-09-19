@@ -46,6 +46,14 @@ public sealed class EntityFactory {
                 Layer = CollisionUtil.GetString(collision.Layer),
                 Mask = CollisionUtil.GetString(collision.Mask)
             },
+            ContentEntity.AiComponentDefinition ai => new AiComponent() {
+                Prudence = ai.Prudence,
+                Impulsivity = ai.Impulsivity,
+                Aggressivity = ai.Aggressivity,
+                Courage =  ai.Courage,
+                Curiosity = ai.Curiosity,
+                Discipline =  ai.Discipline
+            },
             _ => throw new NotSupportedException($"Unknown component definition {definition.GetType()}")
         };
     }

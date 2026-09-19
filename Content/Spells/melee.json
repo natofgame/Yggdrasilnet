@@ -17,6 +17,6 @@
   "effects": [
     { "type": "Damage", "target": "Target", "amount": 15 },
     { "type": "Punch", "target": "Target", "amount": 20 },
-    { "type": "Dash", "target": "Self", "amount": 1, "duration": 0.1 }
+    { "type": "Dash", "target": "Self", "amount": 5, "duration": 0.1 }
   ]
 }
