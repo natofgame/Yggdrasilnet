@@ -1,5 +1,4 @@
 ﻿using System.Numerics;
-using Yggdrasilnet.Server.Simulation.Content.Ai.Behaviors;
 using Yggdrasilnet.Server.Simulation.World.Component;
 using Yggdrasilnet.Shared.Compatibility;
 using Yggdrasilnet.Shared.Spell;
@@ -7,13 +6,6 @@ using Yggdrasilnet.Shared.Spell;
 namespace Yggdrasilnet.Server.Simulation.Content.Ai;
 
 public static class AiBrain {
-    private static readonly IAiBehavior[] Behaviors = [
-        new AttackBehavior(),
-        new FleeBehavior(),
-        new FlankBehavior(),
-        new WanderBehavior()
-    ];
-
     public static void Tick(World.World world, World.Entity entity, float dt) {
         if (!entity.TryGetComponent<AiComponent>(out var ai)) {
             return;
@@ -63,9 +55,9 @@ public static class AiBrain {
 
         Reset(steering);
 
-        IAiBehavior? best = null;
+        AiBehavior? best = null;
         var bestScore = 0f;
-        foreach (var behavior in Behaviors) {
+        foreach (var behavior in ai.Actions) {
             var score = behavior.Score(ai);
             if (score > bestScore) {
                 bestScore = score;

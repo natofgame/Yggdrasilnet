@@ -3,8 +3,12 @@ using Yggdrasilnet.Server.Simulation.World.Component;
 
 namespace Yggdrasilnet.Server.Simulation.Content.Ai.Behaviors;
 
-public sealed class FleeBehavior : IAiBehavior {
-    public float Score(AiComponent ai) {
+public sealed class FleeBehavior : AiBehavior {
+    public float Speed { get; set; } = 1f;
+    public float DashMultiplier { get; set; } = 1.5f;
+    public float DashDuration { get; set; } = 0.2f;
+
+    public override float Score(AiComponent ai) {
         if (!ai.HasTarget) {
             return 0f;
         }
@@ -14,9 +18,9 @@ public sealed class FleeBehavior : IAiBehavior {
         return prudence * (1f - courage) * (1f - ai.HealthRatio);
     }
 
-    public void Tick(World.Entity entity, AiComponent ai, SteeringComponent steering, float dt) {
+    public override void Tick(World.Entity entity, AiComponent ai, SteeringComponent steering, float dt) {
         steering.SeekWeight = -1f;
-        steering.MoveSpeed = 1f;
+        steering.MoveSpeed = Speed;
 
         var away = new Vector2(-ai.TargetDirection.X, -ai.TargetDirection.Z);
         if (away.LengthSquared() > 0.0001f) {
@@ -25,8 +29,8 @@ public sealed class FleeBehavior : IAiBehavior {
 
         steering.HasDash = true;
         steering.DashDirection = away;
-        steering.DashSpeed = steering.MoveSpeed * 1.5f;
-        steering.DashTimer = 0.2f;
+        steering.DashSpeed = Speed * DashMultiplier;
+        steering.DashTimer = DashDuration;
     }
 
     private static float Clamp01(float v) => Math.Clamp(v, 0f, 1f);

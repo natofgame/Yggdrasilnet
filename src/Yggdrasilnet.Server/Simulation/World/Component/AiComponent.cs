@@ -1,4 +1,5 @@
 ﻿using System.Numerics;
+using Yggdrasilnet.Server.Simulation.Content.Ai;
 
 namespace Yggdrasilnet.Server.Simulation.World.Component;
 
@@ -9,6 +10,8 @@ public class AiComponent : IComponent {
     public float Courage { get; set; }
     public float Curiosity { get; set; }
     public float Discipline { get; set; }
+
+    public AiBehavior[] Actions = [];
 
     public float SightRange = 20f;
     public float PerceptionInterval = 0.2f;
@@ -26,9 +29,6 @@ public class AiComponent : IComponent {
     public float SurprisedDuration = 0.4f;
     public float FearDuration = 2.5f;
     public float FearRadius = 8f;
-    public float WanderRadius = 6f;
-    public float WanderArriveDistance = 0.5f;
-    public float WanderIdleDuration = 2f;
 
     public float AttackCooldown;
 

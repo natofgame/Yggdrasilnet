@@ -1,5 +1,5 @@
 ﻿using System.Text.Json.Serialization;
-using Yggdrasilnet.Server.Simulation.World.Component;
+using Yggdrasilnet.Server.Simulation.Content.Ai;
 
 namespace Yggdrasilnet.Server.Simulation.Content.Entity;
 
@@ -73,11 +73,9 @@ public sealed class AiComponentDefinition : EntityComponentDefinition {
 
     public float SightRange { get; set; } = 20f;
     public float PerceptionInterval { get; set; } = 0.2f;
-
     public float SurprisedDuration { get; set; } = 0.4f;
     public float FearDuration { get; set; } = 2.5f;
     public float FearRadius { get; set; } = 8f;
-    public float WanderRadius { get; set; } = 6f;
-    public float WanderArriveDistance { get; set; } = 0.5f;
-    public float WanderIdleDuration { get; set; } = 2f;
+
+    public List<AiBehavior> Actions { get; set; } = [];
 }

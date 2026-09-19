@@ -2,13 +2,16 @@ using Yggdrasilnet.Server.Simulation.World.Component;
 
 namespace Yggdrasilnet.Server.Simulation.Content.Ai.Behaviors;
 
-public sealed class AttackBehavior : IAiBehavior {
-    private const float CastRange = 1.2f;
-    private const float MinCooldown = 1f;
-    private const float MaxCooldown = 5f;
-    private const float CooldownJitter = 3f;
+public sealed class AttackBehavior : AiBehavior {
+    public float Speed { get; set; } = 7f;
+    public float CastRange { get; set; } = 1.2f;
+    public float CircleWeight { get; set; } = 0.3f;
+    public byte SpellIndex { get; set; }
+    public float MinCooldown { get; set; } = 1f;
+    public float MaxCooldown { get; set; } = 5f;
+    public float CooldownJitter { get; set; } = 3f;
 
-    public float Score(AiComponent ai) {
+    public override float Score(AiComponent ai) {
         if (!ai.HasTarget || ai.AttackCooldown > 0f) {
             return 0f;
         }
@@ -20,20 +23,20 @@ public sealed class AttackBehavior : IAiBehavior {
                + impulsivity * (1f - ai.HealthRatio) * 0.25f;
     }
 
-    public void Tick(World.Entity entity, AiComponent ai, SteeringComponent steering, float dt) {
+    public override void Tick(World.Entity entity, AiComponent ai, SteeringComponent steering, float dt) {
         if (ai.TargetDistance <= CastRange) {
             steering.MoveSpeed = 0f;
-            entity.AddComponent(new CastSpellIntentComponent { SpellIndex = 0 });
+            entity.AddComponent(new CastSpellIntentComponent { SpellIndex = SpellIndex });
             ai.AttackCooldown = ResolveCooldown(ai.Aggressivity);
             return;
         }
 
         steering.SeekWeight = 1f;
-        steering.CircleWeight = 0.3f;
-        steering.MoveSpeed = 7f;
+        steering.CircleWeight = CircleWeight;
+        steering.MoveSpeed = Speed;
     }
 
-    private static float ResolveCooldown(float aggressivity) {
+    private float ResolveCooldown(float aggressivity) {
         var t = Clamp01(aggressivity / 10f);
         var baseCooldown = MathF.Max(0.05f, float.Lerp(MaxCooldown, MinCooldown, t));
         var jitter = ((float)Random.Shared.NextDouble() * 2f - 1f) * CooldownJitter;
