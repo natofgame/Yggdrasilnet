@@ -13,7 +13,16 @@ public class CollisionComponent : Shared.Network.Packet.Snapshot.Components.Coll
         return aToB && bToA;
     }
 
-    public BoundingBoxes GetWorldBoundingBoxes(Vector3 position) {
+    public BoundingBoxes GetWorldAabb(Vector3 position) {
         return BoundingBoxes.From(position, Size);
+    }
+
+    public BoundingBoxes GetSweptWorldAabb(Vector3 from, Vector3 to) {
+        var start = GetWorldAabb(from);
+        if (from == to) {
+            return start;
+        }
+
+        return start.Encapsulate(GetWorldAabb(to));
     }
 }

@@ -70,6 +70,10 @@ public sealed class World(
     }
 
     public void Update(float deltaTime) {
+        foreach (var entity in _entityManager.Entities) {
+            entity.PreviousPosition = entity.Position;
+        }
+
         _systemManager.Update(this, deltaTime);
     } 
     
@@ -78,20 +82,7 @@ public sealed class World(
         Func<Entity, CollisionComponent, bool>? filter = null
     ) {
         var results = new List<Entity>();
-
-        foreach (var (entity, collider) in Query<CollisionComponent>()) {
-            if (filter is not null && !filter(entity, collider)) {
-                Console.WriteLine("Filter: " + entity.Id);
-                continue;
-            }
-
-            var entityBox = collider.GetWorldBoundingBoxes(entity.Position);
-            if (box.Intersects(entityBox)) {
-                results.Add(entity);
-                Console.WriteLine("Query: " + entity.Id);
-            }
-        }
-
+        CollisionQuery.CollectOverlaps(this, box, results, filter);
         return results;
     }
 
@@ -100,8 +91,7 @@ public sealed class World(
         AddSystem(new SteeringSystem());
         AddSystem(new MovementSystem());
         AddSystem(new CollisionSystem());
-        
-        AddSystem(new AiSensorSystem());
+
         AddSystem(new AiSystem());
         
         var phaseSystem = new SpellPhaseSystem(_spellDefinitions);
