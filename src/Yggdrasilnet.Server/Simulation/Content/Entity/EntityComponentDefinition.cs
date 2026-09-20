@@ -1,4 +1,5 @@
 ﻿using System.Text.Json.Serialization;
+using Yggdrasilnet.Server.Simulation.Content.Ai;
 
 namespace Yggdrasilnet.Server.Simulation.Content.Entity;
 
@@ -11,6 +12,7 @@ namespace Yggdrasilnet.Server.Simulation.Content.Entity;
 [JsonDerivedType(typeof(SpellbookComponentDefinition), "spellbook")]
 [JsonDerivedType(typeof(AutocastComponentDefinition), "autocast")]
 [JsonDerivedType(typeof(CollisionComponentDefinition), "collision")]
+[JsonDerivedType(typeof(AiComponentDefinition), "ai")]
 public abstract class EntityComponentDefinition;
 
 public sealed class VelocityComponentDefinition : EntityComponentDefinition {
@@ -59,4 +61,21 @@ public sealed class CollisionComponentDefinition : EntityComponentDefinition {
     public bool IsTrigger { get; set; } = false;
     public string Layer { get; set; } = "world";
     public string Mask { get; set; } = "all";
+}
+
+public sealed class AiComponentDefinition : EntityComponentDefinition {
+    public float Prudence { get; set; } = 0f;
+    public float Impulsivity { get; set; } = 0f;
+    public float Aggressivity { get; set; } = 0f;
+    public float Courage { get; set; } = 0f;
+    public float Curiosity { get; set; } = 0f;
+    public float Discipline { get; set; } = 0f;
+
+    public float SightRange { get; set; } = 20f;
+    public float PerceptionInterval { get; set; } = 0.2f;
+    public float SurprisedDuration { get; set; } = 0.4f;
+    public float FearDuration { get; set; } = 2.5f;
+    public float FearRadius { get; set; } = 8f;
+
+    public List<AiBehavior> Actions { get; set; } = [];
 }

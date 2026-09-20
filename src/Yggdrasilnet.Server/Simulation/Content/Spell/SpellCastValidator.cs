@@ -44,9 +44,10 @@ public static class SpellCastValidator {
         nearest = null!;
         var bestDistSq = range * range;
         var found = false;
+        var enemyLayer =  SpellTargetResolver.ResolveEnemyLayer(caster);
 
         foreach (var (entity, collider) in world.Query<CollisionComponent>()) {
-            if (entity == caster || collider.Layer != CollisionLayer.Monster) {
+            if (entity == caster || collider.Layer != enemyLayer) {
                 continue;
             }
 
@@ -62,4 +63,6 @@ public static class SpellCastValidator {
 
         return found;
     }
+    
+    
 }

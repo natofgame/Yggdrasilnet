@@ -1,0 +1,22 @@
+{
+  "id": "charge_melee",
+  "type": "Melee",
+  "timing": {
+    "anticipation": 0.4,
+    "strike": 0.15,
+    "impact": 0.3,
+    "return": 0.20
+  },
+  "targeting": {
+    "range": 1.2,
+    "hitBoxMin": { "x": -3.25, "y": -1, "z": -3.25 },
+    "hitBoxMax": { "x": 3.25,  "y": 1,  "z": 3.25 },
+    "cardinalHitBoxMin": { "x": -3.6, "y": -1, "z": -3.25 },
+    "cardinalHitBoxMax": { "x": 3.6,  "y": 1,  "z": 3.25 }
+  },
+  "effects": [
+    { "type": "Damage", "target": "Target", "amount": 200 },
+    { "type": "Punch", "target": "Target", "amount": 20 },
+    { "type": "Dash", "target": "Self", "amount": 5, "duration": 2 }
+  ]
+}

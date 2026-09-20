@@ -10,6 +10,7 @@ using Yggdrasilnet.Server.Simulation.Content.Spell.Effect;
 using Yggdrasilnet.Server.Simulation.World.Component;
 using Yggdrasilnet.Server.Simulation.World.Managers;
 using Yggdrasilnet.Server.Simulation.World.System;
+using Yggdrasilnet.Server.Simulation.World.System.Ai;
 using Yggdrasilnet.Server.Simulation.World.System.Combat;
 using Yggdrasilnet.Server.Simulation.World.System.Physic;
 using Yggdrasilnet.Server.Simulation.World.System.Physic.Collision;
@@ -99,6 +100,9 @@ public sealed class World(
         AddSystem(new SteeringSystem());
         AddSystem(new MovementSystem());
         AddSystem(new CollisionSystem());
+        
+        AddSystem(new AiSensorSystem());
+        AddSystem(new AiSystem());
         
         var phaseSystem = new SpellPhaseSystem(_spellDefinitions);
         AddSystem(phaseSystem);
