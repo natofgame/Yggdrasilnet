@@ -8,15 +8,30 @@
     "return": 0.15
   },
   "targeting": {
-    "range": 1.2,
-    "hitBoxMin": { "x": -1.25, "y": -1, "z": -1.25 },
-    "hitBoxMax": { "x": 1.25,  "y": 1,  "z": 1.25 },
-    "cardinalHitBoxMin": { "x": -1.6, "y": -1, "z": -1.25 },
-    "cardinalHitBoxMax": { "x": 1.6,  "y": 1,  "z": 1.25 }
+    "range": 1,
+    "hitBoxMin": {
+      "x": -5.0,
+      "y": -1,
+      "z": -5.0
+    },
+    "hitBoxMax": {
+      "x": 5.0,
+      "y": 2,
+      "z": 5.0
+    },
+    "cardinalHitBoxMin": {
+      "x": -5.5,
+      "y": -1,
+      "z": -5.0
+    },
+    "cardinalHitBoxMax": {
+      "x": 5.5,
+      "y": 2,
+      "z": 5.0
+    }
   },
   "effects": [
     { "type": "Damage", "target": "Target", "amount": 15 },
-    { "type": "Punch", "target": "Target", "amount": 20 },
-    { "type": "Dash", "target": "Self", "amount": 5, "duration": 0.1 }
+    { "type": "Punch", "target": "Target", "amount": 20 }
   ]
 }

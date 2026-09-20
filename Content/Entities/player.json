@@ -5,11 +5,11 @@
     { "type": "input", "speed":  3},
     { "type": "health", "max": 1000 },
     { "type": "spellbook", "spells": ["charge_melee", "dash", "melee"] },
-    { "type": "steering", "speed":  3},
+    { "type": "steering", "speed":  2.5},
     { "type":  "collision", 
-      "x": 1,
-      "y": 2,
-      "z": 1,
+      "x": 0.8,
+      "y": 1.8,
+      "z": 0.8,
       "layer": "player"
     }
   ]

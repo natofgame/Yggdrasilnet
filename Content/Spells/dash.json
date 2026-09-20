@@ -9,6 +9,6 @@
   },
   "skipReturnPhase": true,
   "effects": [
-    { "type": "Dash", "target": "Self", "amount": 8, "duration": 0.4 }
+    { "type": "Dash", "target": "Self", "amount": 5, "duration": 0.3 }
   ]
 }
