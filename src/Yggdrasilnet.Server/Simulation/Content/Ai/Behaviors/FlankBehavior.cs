@@ -15,10 +15,12 @@ public sealed class FlankBehavior : AiBehavior {
         return curiosity * Clamp01(ai.TargetDistance / 10f);
     }
 
-    public override void Tick(World.Entity entity, AiComponent ai, SteeringComponent steering, float dt) {
+    public override void Tick(World.World world, World.Entity entity, AiComponent ai, SteeringComponent steering, float dt) {
         steering.CircleRadius = Distance;
         steering.CircleDirection = entity.Id % 2 == 0 ? 1f : -1f;
         steering.CircleWeight = 1f;
+        steering.WanderJitter = 0.5f;
+        steering.WanderWeight = 0.5f;
         steering.MoveSpeed = Speed;
     }
 

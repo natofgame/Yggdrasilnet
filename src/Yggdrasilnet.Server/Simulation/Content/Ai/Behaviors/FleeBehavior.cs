@@ -18,7 +18,7 @@ public sealed class FleeBehavior : AiBehavior {
         return prudence * (1f - courage) * (1f - ai.HealthRatio);
     }
 
-    public override void Tick(World.Entity entity, AiComponent ai, SteeringComponent steering, float dt) {
+    public override void Tick(World.World world, World.Entity entity, AiComponent ai, SteeringComponent steering, float dt) {
         steering.SeekWeight = -1f;
         steering.MoveSpeed = Speed;
 

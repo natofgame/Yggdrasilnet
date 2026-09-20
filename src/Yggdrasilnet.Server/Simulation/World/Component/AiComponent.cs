@@ -31,6 +31,10 @@ public class AiComponent : IComponent {
     public float FearRadius = 8f;
 
     public float AttackCooldown;
+    public bool HasAttackToken;
+    public float TokenTimer;
+    public float TokenWait;
+    public float SlotAngle;
 
     public bool HadTargetLastTick;
     public bool IsSurprised;

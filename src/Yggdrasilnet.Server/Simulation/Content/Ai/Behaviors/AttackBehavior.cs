@@ -7,23 +7,25 @@ public sealed class AttackBehavior : AiBehavior {
     public float CastRange { get; set; } = 1.2f;
     public float CircleWeight { get; set; } = 0.3f;
     public byte SpellIndex { get; set; }
-    public float MinCooldown { get; set; } = 1f;
-    public float MaxCooldown { get; set; } = 5f;
+    public float MinCooldown { get; set; } = 5f;
+    public float MaxCooldown { get; set; } = 10f;
     public float CooldownJitter { get; set; } = 3f;
 
     public override float Score(AiComponent ai) {
-        if (!ai.HasTarget || ai.AttackCooldown > 0f) {
+        if (!ai.HasTarget || !ai.HasAttackToken || ai.AttackCooldown > 0f) {
             return 0f;
         }
 
         var aggro = Clamp01(ai.Aggressivity / 10f);
         var impulsivity = Clamp01(ai.Impulsivity / 10f);
-        return ai.HealthRatio * aggro
-               + (1f - ai.TargetHealthRatio) * 0.25f
-               + impulsivity * (1f - ai.HealthRatio) * 0.25f;
+        var score = ai.HealthRatio * aggro
+                    + (1f - ai.TargetHealthRatio) * 0.25f
+                    + impulsivity * (1f - ai.HealthRatio) * 0.25f;
+
+        return MathF.Max(0.3f, score);
     }
 
-    public override void Tick(World.Entity entity, AiComponent ai, SteeringComponent steering, float dt) {
+    public override void Tick(World.World world, World.Entity entity, AiComponent ai, SteeringComponent steering, float dt) {
         if (ai.TargetDistance <= CastRange) {
             steering.MoveSpeed = 0f;
             entity.AddComponent(new CastSpellIntentComponent { SpellIndex = SpellIndex });

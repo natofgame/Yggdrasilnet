@@ -6,6 +6,7 @@ namespace Yggdrasilnet.Server.Simulation.World;
 public sealed class Entity {
     public int Id { get; }
     public Vector3 Position { get; set; }
+    public Vector3 PreviousPosition { get; set; }
     
     public byte DefinitionIndex { get; internal set; }
 
@@ -17,6 +18,7 @@ public sealed class Entity {
     public Entity(int id, Vector3 position = default) {
         Id = id;
         Position = position;
+        PreviousPosition = position;
         
         AddComponent(new DirectionComponent());
     }

@@ -43,8 +43,8 @@ public sealed class EntityFactory {
                 Y = collision.Y,
                 Z = collision.Z,
                 IsTrigger = collision.IsTrigger,
-                Layer = CollisionUtil.GetString(collision.Layer),
-                Mask = CollisionUtil.GetString(collision.Mask)
+                Layer = CollisionUtil.ParseLayers(collision.Layer),
+                Mask = CollisionUtil.ParseLayers(collision.Mask)
             },
             ContentEntity.AiComponentDefinition ai => new AiComponent {
                 Prudence = ai.Prudence,

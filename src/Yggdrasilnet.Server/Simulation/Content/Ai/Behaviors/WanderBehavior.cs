@@ -11,7 +11,7 @@ public sealed class WanderBehavior : AiBehavior {
 
     public override float Score(AiComponent ai) => ai.HasTarget ? 0.01f : 1f;
 
-    public override void Tick(World.Entity entity, AiComponent ai, SteeringComponent steering, float dt) {
+    public override void Tick(World.World world, World.Entity entity, AiComponent ai, SteeringComponent steering, float dt) {
         if (ai.WanderTarget is not { } target) {
             ai.WanderTarget = PickRandomPoint(entity.Position, Radius);
             return;

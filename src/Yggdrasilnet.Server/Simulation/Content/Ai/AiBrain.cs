@@ -19,14 +19,7 @@ public static class AiBrain {
         }
 
         ai.HealthRatio = hp.Current / hp.Max;
-        var hasTarget = TryFindNearestPlayer(
-            world, entity, ai.SightRange,
-            out var targetId, out var targetDistance, out var targetDirection, out var targetHealthRatio);
-
-        ai.TargetEntityId = hasTarget ? targetId : null;
-        ai.TargetDistance = hasTarget ? targetDistance : 0f;
-        ai.TargetDirection = hasTarget ? targetDirection : Vector3.Zero;
-        ai.TargetHealthRatio = hasTarget ? targetHealthRatio : 0f;
+        var hasTarget = RefreshTarget(world, entity, ai, dt);
 
         if (hasTarget && !ai.HadTargetLastTick) {
             ai.IsSurprised = true;
@@ -65,7 +58,7 @@ public static class AiBrain {
             }
         }
 
-        best?.Tick(entity, ai, steering, dt);
+        best?.Tick(world, entity, ai, steering, dt);
     }
 
     private static void Stop(World.Entity entity) {
@@ -83,25 +76,59 @@ public static class AiBrain {
         steering.HasDash = false;
     }
 
-    private static bool TryFindNearestPlayer(
-        World.World world,
-        World.Entity self,
-        float range,
-        out int targetId,
-        out float distance,
-        out Vector3 direction,
-        out float healthRatio
-    ) {
-        targetId = 0;
-        distance = 0f;
-        direction = Vector3.Zero;
-        healthRatio = 0f;
+    private static bool RefreshTarget(World.World world, World.Entity self, AiComponent ai, float dt) {
+        if (TryKeepCurrentTarget(world, self, ai)) {
+            if (ai.PerceptionTimer > 0f) {
+                ai.PerceptionTimer -= dt;
+            }
+            if (ai.PerceptionTimer <= 0f) {
+                ai.PerceptionTimer = ai.PerceptionInterval;
+            }
+            return true;
+        }
 
-        World.Entity? nearest = null;
+        ai.PerceptionTimer -= dt;
+        if (ai.TargetEntityId is not null || ai.PerceptionTimer <= 0f) {
+            ai.PerceptionTimer = ai.PerceptionInterval;
+            if (TryFindNearestPlayer(world, self, ai.SightRange, out var target)) {
+                ApplyTarget(self, ai, target);
+                return true;
+            }
+        }
+
+        ClearTarget(ai);
+        return false;
+    }
+
+    private static bool TryKeepCurrentTarget(World.World world, World.Entity self, AiComponent ai) {
+        if (ai.TargetEntityId is not { } targetId || !world.TryGetEntity(targetId, out var current)) {
+            return false;
+        }
+
+        if (!current.TryGetComponent<CollisionComponent>(out var collider)
+            || collider.Layer != CollisionLayer.Player) {
+            return false;
+        }
+
+        if (current.TryGetComponent<HealthComponent>(out var hp) && hp.Current <= 0f) {
+            return false;
+        }
+
+        ApplyTarget(self, ai, current);
+        return ai.TargetDistance <= ai.SightRange;
+    }
+
+    private static bool TryFindNearestPlayer(World.World world, World.Entity self, float range, out World.Entity nearest) {
+        nearest = null!;
         var bestDistSq = range * range;
+        var found = false;
 
         foreach (var (other, collider) in world.Query<CollisionComponent>()) {
             if (other == self || collider.Layer != CollisionLayer.Player) {
+                continue;
+            }
+
+            if (other.TryGetComponent<HealthComponent>(out var hp) && hp.Current <= 0f) {
                 continue;
             }
 
@@ -112,24 +139,31 @@ public static class AiBrain {
 
             bestDistSq = distSq;
             nearest = other;
+            found = true;
         }
 
-        if (nearest is null) {
-            return false;
+        return found;
+    }
+
+    private static void ApplyTarget(World.Entity self, AiComponent ai, World.Entity target) {
+        ai.TargetEntityId = target.Id;
+        ai.TargetHealthRatio = 0f;
+        if (target.TryGetComponent<HealthComponent>(out var targetHp) && targetHp.Max > 0f) {
+            ai.TargetHealthRatio = targetHp.Current / targetHp.Max;
         }
 
-        if (nearest.TryGetComponent<HealthComponent>(out var targetHp) && targetHp.Max > 0f) {
-            healthRatio = targetHp.Current / targetHp.Max;
-        }
-
-        var toTarget = nearest.Position - self.Position;
+        var toTarget = target.Position - self.Position;
         toTarget.Y = 0;
-        distance = toTarget.Length();
-        if (toTarget.LengthSquared() > 0.0001f) {
-            direction = Vector3.Normalize(toTarget);
-        }
+        ai.TargetDistance = toTarget.Length();
+        ai.TargetDirection = toTarget.LengthSquared() > 0.0001f
+            ? Vector3.Normalize(toTarget)
+            : Vector3.Zero;
+    }
 
-        targetId = nearest.Id;
-        return true;
+    private static void ClearTarget(AiComponent ai) {
+        ai.TargetEntityId = null;
+        ai.TargetDistance = 0f;
+        ai.TargetDirection = Vector3.Zero;
+        ai.TargetHealthRatio = 0f;
     }
 }
