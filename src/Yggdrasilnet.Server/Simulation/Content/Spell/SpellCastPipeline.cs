@@ -7,14 +7,14 @@ namespace Yggdrasilnet.Server.Simulation.Content.Spell;
 public sealed class SpellCastPipeline() {
     private readonly SpellEffectApplier _effects = new();
     
-    public void Cast(World.World world, World.Entity caster, SpellDefinition spell) {
+    public void Cast(World.World world, World.Entity caster, SpellDefinition spell, SpellPhase phase) {
         if (!SpellCastValidator.TryCreate(world, caster, spell, out var context)) {
             return;
         }
-        _effects.ApplySelf(world, context, caster, spell);
+        _effects.ApplySelf(world, context, caster, spell, phase);
 
         foreach (var target in SpellTargetResolver.Resolve(world, context, spell.Targeting, caster)) { 
-            _effects.ApplyToTarget(world, context, target, spell);
+            _effects.ApplyToTarget(world, context, target, spell, phase);
         }
     }
 }

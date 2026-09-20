@@ -38,9 +38,10 @@ public sealed class SpellPhaseSystem(
                     break;
                 }
                 remaining -= MathF.Max(0f, action.PhaseTimeRemaining);
-                if (action.Phase == SpellPhase.Strike) {
-                    _pipeline.Cast(world, entity, spell);
+                if (action.Phase == SpellPhase.Strike || action.Phase == SpellPhase.Anticipation) {
+                    _pipeline.Cast(world, entity, spell, action.Phase);
                 }
+                
                 action.Phase = action.Phase switch {
                     SpellPhase.Anticipation => SpellPhase.Strike,
                     SpellPhase.Strike => SpellPhase.Impact,
