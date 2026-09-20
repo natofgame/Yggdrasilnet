@@ -1,19 +1,17 @@
 namespace Yggdrasilnet.Server.Utils;
 
-public static class ContentPaths {
-    public static string Resolve(string relativePath) {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+public static class ContentPaths
+{
+    public static string Resolve(string relativePath)
+    {
+        var contentDir = Path.Combine(AppContext.BaseDirectory, "Content");
 
-        while (dir != null) {
-            var contentDir = Path.Combine(dir.FullName, "Content");
-            if (Directory.Exists(contentDir)) {
-                return Path.Combine(contentDir, relativePath);
-            }
-
-            dir = dir.Parent;
+        if (!Directory.Exists(contentDir))
+        {
+            throw new DirectoryNotFoundException(
+                $"Could not locate 'Content' folder at {contentDir}");
         }
 
-        throw new DirectoryNotFoundException(
-            $"Could not locate a 'Content' folder above {AppContext.BaseDirectory}");
+        return Path.Combine(contentDir, relativePath);
     }
 }
